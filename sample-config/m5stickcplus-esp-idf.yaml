@@ -1,0 +1,47 @@
+# Minimal M5StickC Plus example for ESPHome 2026.10 and ESP-IDF.
+# Copy to a YAML file in your ESPHome configuration directory.
+# Define wifi_ssid and wifi_password in secrets.yaml.
+#
+# This initializes the AXP192 power rails and exposes battery sensors.
+# The display and BLE mesh can be added after confirming stable operation.
+
+esphome:
+  name: m5stickcplus
+
+esp32:
+  board: m5stick-c
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://realholgi/esphome-axp192@main
+    components: [axp192]
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+i2c:
+  - id: bus_a
+    sda: GPIO21
+    scl: GPIO22
+    scan: true
+
+sensor:
+  - platform: axp192
+    model: M5STICKC
+    address: 0x34
+    i2c_id: bus_a
+    update_interval: 30s
+    battery_level:
+      name: "M5Stick Battery Level"
+    charging:
+      name: "M5Stick Charging"
