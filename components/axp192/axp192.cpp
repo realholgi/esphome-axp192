@@ -260,7 +260,8 @@ bool AXP192Component::ReadBuff(uint8_t addr, uint8_t size, uint8_t *buffer) {
 
 void AXP192Component::UpdateBrightness()
 {
-    if (brightness_ == curr_brightness_)
+    const float requested = this->display_enabled_ ? brightness_ : 0.0f;
+    if (requested == curr_brightness_)
     {
         return;
     }
@@ -270,7 +271,7 @@ void AXP192Component::UpdateBrightness()
 
     const uint8_t c_min = 7;
     const uint8_t c_max = 12;
-    auto ubri = c_min + static_cast<uint8_t>(brightness_ * (c_max - c_min));
+    auto ubri = c_min + static_cast<uint8_t>(requested * (c_max - c_min));
 
     if (ubri > c_max)
     {
@@ -284,8 +285,8 @@ void AXP192Component::UpdateBrightness()
         if (!Write1Byte(0x28, (buf & 0x0f) | (ubri << 4))) return;
         // Only a requested zero brightness disables LDO2. Restore it if
         // brightness is raised again. Default brightness remains unchanged.
-        if ((brightness_ == 0.0f || curr_brightness_ == 0.0f) &&
-            !SetLDO2(brightness_ > 0.0f)) return;
+        if ((requested == 0.0f || curr_brightness_ == 0.0f) &&
+            !SetLDO2(requested > 0.0f)) return;
         break;
       }
       case AXP192_M5CORE2:
@@ -303,7 +304,7 @@ void AXP192Component::UpdateBrightness()
         break;
       }
     }
-    curr_brightness_ = brightness_;
+    curr_brightness_ = requested;
 }
 
 bool AXP192Component::GetBatState()
@@ -704,6 +705,27 @@ std::string AXP192Component::GetStartupReason() {
   return std::string{"RESET_UNKNOWN_REASON"};
 }
 
+
+
+void AXP192DisplaySwitch::setup() {
+  bool value = this->initial_value_;
+  if (this->restore_value_) {
+    this->pref_ = this->make_entity_preference<bool>();
+    if (!this->pref_.load(&value)) value = this->initial_value_;
+  }
+  this->parent_->set_display_enabled(value);
+  this->publish_state(value);
+}
+
+void AXP192DisplaySwitch::dump_config() {
+  LOG_SWITCH("", "AXP192 Display", this);
+}
+
+void AXP192DisplaySwitch::write_state(bool state) {
+  this->parent_->set_display_enabled(state);
+  this->publish_state(state);
+  if (this->restore_value_) this->pref_.save(&state);
+}
 
 void AXP192BrightnessNumber::setup() {
   float value = this->initial_value_;
