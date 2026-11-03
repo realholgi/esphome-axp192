@@ -674,6 +674,36 @@ std::string AXP192Component::GetStartupReason() {
   return std::string{"RESET_UNKNOWN_REASON"};
 }
 
-}
+
+void AXP192BrightnessNumber::setup() {
+  float value = this->initial_value_;
+  if (this->restore_value_) {
+    this->pref_ = this->make_entity_preference<float>();
+    if (!this->pref_.load(&value))
+      value = this->initial_value_;
+  }
+  this->apply_value_(value, false);
 }
 
+void AXP192BrightnessNumber::dump_config() {
+  LOG_NUMBER("", "AXP192 display brightness", this);
+  ESP_LOGCONFIG(TAG, "  Restore value: %s", YESNO(this->restore_value_));
+}
+
+void AXP192BrightnessNumber::control(float value) {
+  this->apply_value_(value, true);
+}
+
+void AXP192BrightnessNumber::apply_value_(float value, bool persist) {
+  // Restoration and MQTT commands use the same 0-100% range.
+  value = detail::clamp_percent(value);
+  this->parent_->set_brightness(value / 100.0f);
+  this->parent_->apply_brightness();
+  // This state is the requested setpoint, not a measurement of the backlight.
+  this->publish_state(value);
+  if (persist && this->restore_value_)
+    this->pref_.save(&value);
+}
+
+}
+}

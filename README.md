@@ -36,26 +36,38 @@ an I2C read failure, the last value is retained until a successful read.
 
 ### M5StickC / M5StickC Plus backlight power
 
-For `model: M5STICKC`, setting `brightness: 0%` turns the display
+For `model: M5STICKC`, setting the native number to 0% turns the display
 **backlight supply (AXP192 LDO2)** completely off, instead of leaving it
 at the minimum brightness voltage. The TFT controller's supply is not
-intentionally disabled. The default is still `brightness: 100%`; settings
-greater than zero retain the original dimming behavior.
+intentionally disabled. The default remains 100%.
 
 ```yaml
 sensor:
   - platform: axp192
+    id: axp_power
     model: M5STICKC
     i2c_id: bus_a
-    brightness: 0%  # Optional: turn off the backlight supply
     battery_level:
       name: "M5Stick Battery Level"
+
+number:
+  - platform: axp192
+    axp192_id: axp_power
+    name: "Display Brightness"
+    mode: slider
+    restore_value: true
+    initial_value: 100
 ```
 
-This feature applies to `M5STICKC` only, not `M5CORE2` or `M5TOUGH`.
-Changes to the requested brightness in component code can re-enable
-the backlight. I2C errors prevent the brightness transition from being
-marked as successful, allowing a subsequent poll to retry it.
+The brightness slider is a native ESPHome `number` entity, exposed via
+the native API or MQTT discovery when these integrations are enabled.
+Its state is the requested percentage, not a measured brightness.
+The last setting is saved to flash on user changes and restored at boot.
+The former static `brightness:` option in `sensor:` is no longer accepted.
+
+Turning the backlight completely off is supported for `M5STICKC`
+only, not `M5CORE2` or `M5TOUGH`. I2C failures cause the
+component to retry applying the requested setting on a later update.
 
 ### Verify a change
 

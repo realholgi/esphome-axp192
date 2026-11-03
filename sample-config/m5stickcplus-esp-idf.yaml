@@ -37,6 +37,7 @@ i2c:
 
 sensor:
   - platform: axp192
+    id: axp_power
     model: M5STICKC
     address: 0x34
     i2c_id: bus_a
@@ -45,3 +46,11 @@ sensor:
       name: "M5Stick Battery Level"
     charging:
       name: "M5Stick Charging"
+
+number:
+  - platform: axp192
+    axp192_id: axp_power
+    name: "Display Brightness"
+    mode: slider
+    restore_value: true
+    initial_value: 100

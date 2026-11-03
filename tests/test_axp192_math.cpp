@@ -16,6 +16,9 @@ static_assert(set_ldo2_enabled(0xFF, false) == 0xFB, "disabling LDO2 preserves o
 static_assert(set_ldo2_enabled(0xA1, true) == 0xA5, "enabling LDO2 preserves other rails");
 static_assert(set_ldo2_enabled(0xA1, false) == 0xA1, "disabling already-off LDO2 is idempotent");
 static_assert(set_ldo2_enabled(0xA5, true) == 0xA5, "enabling already-on LDO2 is idempotent");
+static_assert(clamp_percent(-10.0f) == 0.0f, "percentage lower bound");
+static_assert(clamp_percent(110.0f) == 100.0f, "percentage upper bound");
+static_assert(clamp_percent(42.0f) == 42.0f, "percentage unchanged");
 static_assert(!charging(0x20) && charging(0x40) && charging(0x60), "charge flag mask");
 static_assert(!battery_present(0x40) && battery_present(0x20), "battery-present flag mask");
 static_assert(battery_level(2.9f) == 0.0f, "battery level lower bound");

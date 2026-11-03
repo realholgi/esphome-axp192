@@ -34,6 +34,11 @@ constexpr uint8_t set_ldo2_enabled(uint8_t power_control, bool enabled) {
                  : static_cast<uint8_t>(power_control & ~0x04u);
 }
 
+// Constrain user commands and possibly damaged restored preferences.
+constexpr float clamp_percent(float value) {
+  return value < 0.0f ? 0.0f : (value > 100.0f ? 100.0f : (value >= 0.0f ? value : 0.0f));
+}
+
 constexpr bool battery_present(uint8_t status) { return (status & 0x20) != 0; }
 constexpr bool charging(uint8_t status) { return (status & 0x40) != 0; }
 
