@@ -8,35 +8,28 @@ namespace esphome {
 namespace axp192 {
 
 static const char *TAG = "axp192.sensor";
-void AXP192Component::setup()
-{
+void AXP192Component::setup() {
   if (this->i2c_errors_sensor_ != nullptr) this->i2c_errors_sensor_->publish_state(0);
+  bool ok = false;
   switch (this->model_) {
     case AXP192_M5STICKC:
-    {
-        begin(false, false, false, false, false);
-        break;
-    }
+      ok = this->begin(false, false, false, false, false);
+      break;
     case AXP192_M5CORE2:
-    {
-        // disable LDO3 Vibration
-        begin(false, true, false, false, false);
-        break;
-    }
+      // LDO3 powers the vibrator on this device.
+      ok = this->begin(false, true, false, false, false);
+      break;
     case AXP192_M5TOUGH:
-    {
-        begin(false, false, false, false, false);
-
-        // If we're waking from a cold boot
-        if (GetStartupReason() == "ESP_RST_POWERON")
-        {
-            ESP_LOGD(TAG, "First power on, restarting ESP...");
-
-            // Reboot the ESP with the axp initialised
-            esp_restart();
-        }
-        break;
-    }
+      ok = this->begin(false, false, false, false, false);
+      if (ok && GetStartupReason() == "ESP_RST_POWERON") {
+        ESP_LOGD(TAG, "First power on, restarting ESP...");
+        esp_restart();
+      }
+      break;
+  }
+  if (!ok) {
+    ESP_LOGE(TAG, "AXP192 initialization failed; stopping component");
+    this->mark_failed();
   }
 }
 
@@ -117,79 +110,77 @@ void AXP192Component::update() {
     this->apply_brightness();
 }
 
-void AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC, bool disableDCDC1, bool disableDCDC3)
+bool AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC, bool disableDCDC1, bool disableDCDC3)
 {
   switch (this->model_) {
     case AXP192_M5STICKC:
     {
         // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
-        Write1Byte(0x28, 0xcc);
+        if (!Write1Byte(0x28, 0xcc)) return false;
         break;
     }
     case AXP192_M5CORE2:
     {
         // Set DCDC3 (TFT_LED & TFT) 3.0V
-        Write1Byte(0x27, 0xcc);
+        if (!Write1Byte(0x27, 0xcc)) return false;
         // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
-        Write1Byte(0x28, 0xcc);
+        if (!Write1Byte(0x28, 0xcc)) return false;
         break;
     }
     case AXP192_M5TOUGH:
     {
         // Set DCDC3 (TFT_LED & TFT) 3.0V
-        Write1Byte(0x27, 0xcc);
+        if (!Write1Byte(0x27, 0xcc)) return false;
         // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
-        Write1Byte(0x28, 0xcc);
+        if (!Write1Byte(0x28, 0xcc)) return false;
         break;
     }
   }
 
     // Set ADC sample rate to 200hz
-    Write1Byte(0x84, 0b11110010);
+    if (!Write1Byte(0x84, 0b11110010)) return false;
 
     // Set ADC to All Enable
-    Write1Byte(0x82, 0xff);
+    if (!Write1Byte(0x82, 0xff)) return false;
 
     // Bat charge voltage to 4.2, Current 100MA
-    Write1Byte(0x33, 0xc0);
+    if (!Write1Byte(0x33, 0xc0)) return false;
 
     // Depending on configuration enable LDO2, LDO3, DCDC1, DCDC3.
     uint8_t power = 0;
-    if (!TryRead8(0x12, &power)) {
-      this->mark_failed();
-      return;
-    }
+    if (!TryRead8(0x12, &power)) return false;
     uint8_t buf = (power & 0xef) | 0x4D;
     if(disableLDO3) buf &= ~(1<<3);
     if(disableLDO2) buf &= ~(1<<2);
     if(disableDCDC3) buf &= ~(1<<1);
     if(disableDCDC1) buf &= ~(1<<0);
-    Write1Byte(0x12, buf);
+    if (!Write1Byte(0x12, buf)) return false;
 
     // 128ms power on, 4s power off
-    Write1Byte(0x36, 0x0C);
+    if (!Write1Byte(0x36, 0x0C)) return false;
 
     if(!disableRTC)
     {
         // Set RTC voltage to 3.3V
-        Write1Byte(0x91, 0xF0);
+        if (!Write1Byte(0x91, 0xF0)) return false;
 
         // Set GPIO0 to LDO
-        Write1Byte(0x90, 0x02);
+        if (!Write1Byte(0x90, 0x02)) return false;
     }
 
     // Disable vbus hold limit
-    Write1Byte(0x30, 0x80);
+    if (!Write1Byte(0x30, 0x80)) return false;
 
     // Set temperature protection
-    Write1Byte(0x39, 0xfc);
+    if (!Write1Byte(0x39, 0xfc)) return false;
 
     // Enable RTC BAT charge
-    Write1Byte(0x35, 0xa2 & (disableRTC ? 0x7F : 0xFF));
+    if (!Write1Byte(0x35, 0xa2 & (disableRTC ? 0x7F : 0xFF))) return false;
 
     // Enable bat detection
-    Write1Byte(0x32, 0x46);
+    if (!Write1Byte(0x32, 0x46)) return false;
 
+    return true;
 }
 
 void AXP192Component::record_i2c_error_() {

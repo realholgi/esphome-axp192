@@ -108,7 +108,7 @@ protected:
      * LD03: Vibration Motor
      */
 
-    void  begin(bool disableLDO2 = false, bool disableLDO3 = false, bool disableRTC = false, bool disableDCDC1 = false, bool disableDCDC3 = false);
+    bool begin(bool disableLDO2 = false, bool disableLDO3 = false, bool disableRTC = false, bool disableDCDC1 = false, bool disableDCDC3 = false);
     bool UpdateBrightness();
     bool  GetBatState();
     bool  GetChargingState();
