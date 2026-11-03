@@ -47,28 +47,36 @@ void AXP192Component::dump_config() {
 float AXP192Component::get_setup_priority() const { return setup_priority::DATA; }
 
 void AXP192Component::update() {
-
     if (this->batterylevel_sensor_ != nullptr) {
-      // Voltage-only approximation; not a calibrated fuel gauge.
-      float vbat = GetBatVoltage();
-      float batterylevel = 100.0f * ((vbat - 3.0f) / (4.1f - 3.0f));
-
-      ESP_LOGD(TAG, "Got Battery Level=%f (%f)", batterylevel, vbat);
-      if (batterylevel > 100.0f) batterylevel = 100.0f;
-      if (batterylevel < 0.0f) batterylevel = 0.0f;
-      this->batterylevel_sensor_->publish_state(batterylevel);
+      uint8_t raw[2] = {};
+      if (this->read_bytes(0x78, raw, sizeof(raw))) {
+        const uint16_t adc = (static_cast<uint16_t>(raw[0]) << 4) | (raw[1] & 0x0F);
+        const float vbat = adc * 0.0011f;
+        // Voltage-only approximation; this is not a calibrated fuel gauge.
+        float battery_level = 100.0f * ((vbat - 3.0f) / (4.1f - 3.0f));
+        if (battery_level > 100.0f) battery_level = 100.0f;
+        if (battery_level < 0.0f) battery_level = 0.0f;
+        ESP_LOGD(TAG, "Got Battery Level=%f (%f)", battery_level, vbat);
+        this->batterylevel_sensor_->publish_state(battery_level);
+      } else {
+        ESP_LOGW(TAG, "Battery voltage read failed; keeping previous sensor state");
+      }
     }
 
     if (this->charging_sensor_ != nullptr) {
-        bool battery_state = GetBatState();
-      bool charging = GetChargingState();
-      ESP_LOGD(TAG, "Got Charging=%d state=%d", charging, battery_state);
-      this->charging_sensor_->publish_state(charging);
+      uint8_t status = 0;
+      if (this->read_byte(0x01, &status)) {
+        const bool charging = (status & 0x40) != 0;
+        const bool battery_present = (status & 0x20) != 0;
+        ESP_LOGD(TAG, "Got Charging=%d state=%d", charging, battery_present);
+        this->charging_sensor_->publish_state(charging);
+      } else {
+        ESP_LOGW(TAG, "Charging status read failed; keeping previous sensor state");
+      }
     }
 
     UpdateBrightness();
 }
-
 
 void AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC, bool disableDCDC1, bool disableDCDC3)
 {
