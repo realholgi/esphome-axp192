@@ -19,6 +19,10 @@ static_assert(set_ldo2_enabled(0xA5, true) == 0xA5, "enabling already-on LDO2 is
 static_assert(clamp_percent(-10.0f) == 0.0f, "percentage lower bound");
 static_assert(clamp_percent(110.0f) == 100.0f, "percentage upper bound");
 static_assert(clamp_percent(42.0f) == 42.0f, "percentage unchanged");
+static_assert(decode13(0x12, 0x1F) == 607, "13-bit charging current register");
+static_assert(decode12(0x12, 0xF3) == 291, "12-bit USB voltage/current register");
+static_assert(usb_connected(0x20) && usb_connected(0x60), "VBUS presence status");
+static_assert(!usb_connected(0x00) && !usb_connected(0x10), "no USB status");
 static_assert(!charging(0x20) && charging(0x40) && charging(0x60), "charge flag mask");
 static_assert(!battery_present(0x40) && battery_present(0x20), "battery-present flag mask");
 static_assert(battery_level(2.9f) == 0.0f, "battery level lower bound");
