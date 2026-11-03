@@ -14,6 +14,7 @@ CPP = (ROOT / "components/axp192/axp192.cpp").read_text()
 PY = (ROOT / "components/axp192/sensor.py").read_text()
 NUMBER_PY = (ROOT / "components/axp192/number.py").read_text()
 HEADER = (ROOT / "components/axp192/axp192.h").read_text()
+SWITCH_PY = (ROOT / "components/axp192/switch.py").read_text()
 
 
 def method_body(signature: str) -> str:
@@ -150,6 +151,22 @@ class SourceRegressions(unittest.TestCase):
                          "0x39", "0x35", "0x32"):
             if f"Write1Byte({register}," in begin:
                 self.assertRegex(begin, rf"if \(!Write1Byte\({register},")
+
+    def test_optional_display_auto_off_timer(self):
+        self.assertIn('cv.Optional(CONF_AUTO_OFF): cv.positive_time_period_milliseconds', SWITCH_PY)
+        self.assertIn('set_auto_off_ms(config[CONF_AUTO_OFF].total_milliseconds)', SWITCH_PY)
+        self.assertIn('parent.set_display_switch(var)', SWITCH_PY)
+        timer = method_body("AXP192DisplaySwitch::reset_auto_off_timer()")
+        self.assertIn('this->auto_off_ms_ == 0 || !this->state', timer)
+        self.assertIn('this->set_timeout("display_auto_off"', timer)
+        self.assertIn('this->turn_off();', timer)
+        activity = method_body("AXP192BrightnessNumber::apply_value_(")
+        self.assertIn('this->parent_->notify_display_activity()', activity)
+
+    def test_display_auto_off_can_be_woken(self):
+        write = method_body("AXP192DisplaySwitch::write_state(")
+        self.assertIn('this->reset_auto_off_timer()', write)
+        self.assertIn('this->cancel_timeout("display_auto_off")', write)
 
 
 if __name__ == "__main__":

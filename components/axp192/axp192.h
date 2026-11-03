@@ -32,6 +32,8 @@ enum AXP192Model {
 #define CURRENT_630MA  (0b0110)
 #define CURRENT_700MA  (0b0111)
 
+class AXP192DisplaySwitch;
+
 class AXP192Component : public PollingComponent, public i2c::I2CDevice {
 public:
   void set_batterylevel_sensor(sensor::Sensor *batterylevel_sensor) { batterylevel_sensor_ = batterylevel_sensor; }
@@ -44,6 +46,8 @@ public:
   void set_usb_voltage_sensor(sensor::Sensor *value) { usb_voltage_sensor_ = value; }
   void set_usb_current_sensor(sensor::Sensor *value) { usb_current_sensor_ = value; }
   void set_brightness(float brightness) { brightness_ = brightness; }
+  void set_display_switch(AXP192DisplaySwitch *display_switch) { this->display_switch_ = display_switch; }
+  void notify_display_activity();
   bool apply_brightness() {
     if (this->UpdateBrightness()) return true;
     // A prior I2C write may have succeeded before a later one failed.
@@ -90,6 +94,7 @@ protected:
     float brightness_{1.0f};
     float curr_brightness_{-1.0f};
     bool display_enabled_{true};
+    AXP192DisplaySwitch *display_switch_{nullptr};
     bool battery_curve_lipo_{false};
     float battery_smoothing_{1.0f};
     float last_battery_level_{0.0f};
@@ -178,6 +183,8 @@ class AXP192DisplaySwitch : public switch_::Switch, public Component {
   void set_parent(AXP192Component *parent) { this->parent_ = parent; }
   void set_restore_value(bool restore) { this->restore_value_ = restore; }
   void set_initial_value(bool initial) { this->initial_value_ = initial; }
+  void set_auto_off_ms(uint32_t ms) { this->auto_off_ms_ = ms; }
+  void reset_auto_off_timer();
 
   float get_setup_priority() const override { return setup_priority::LATE; }
   void setup() override;
@@ -190,6 +197,7 @@ class AXP192DisplaySwitch : public switch_::Switch, public Component {
   ESPPreferenceObject pref_;
   bool initial_value_{true};
   bool restore_value_{true};
+  uint32_t auto_off_ms_{0};
 };
 
 class AXP192BrightnessNumber : public number::Number, public Component {

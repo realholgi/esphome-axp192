@@ -722,8 +722,12 @@ void AXP192DisplaySwitch::setup() {
     this->pref_ = this->make_entity_preference<bool>();
     if (!this->pref_.load(&value)) value = this->initial_value_;
   }
-  this->parent_->set_display_enabled(value);
+  if (!this->parent_->set_display_enabled(value)) {
+    ESP_LOGW(TAG, "Could not restore display power state");
+    return;
+  }
   this->publish_state(value);
+  if (value) this->reset_auto_off_timer();
 }
 
 void AXP192DisplaySwitch::dump_config() {
@@ -737,6 +741,23 @@ void AXP192DisplaySwitch::write_state(bool state) {
   }
   this->publish_state(state);
   if (this->restore_value_) this->pref_.save(&state);
+  if (state) {
+    this->reset_auto_off_timer();
+  } else {
+    this->cancel_timeout("display_auto_off");
+  }
+}
+
+void AXP192DisplaySwitch::reset_auto_off_timer() {
+  if (this->auto_off_ms_ == 0 || !this->state) return;
+  // Replaces the previous deadline after an ON command or brightness change.
+  this->set_timeout("display_auto_off", this->auto_off_ms_, [this]() {
+    this->turn_off();
+  });
+}
+
+void AXP192Component::notify_display_activity() {
+  if (this->display_switch_ != nullptr) this->display_switch_->reset_auto_off_timer();
 }
 
 void AXP192BrightnessNumber::setup() {
@@ -770,8 +791,10 @@ void AXP192BrightnessNumber::apply_value_(float value, bool persist) {
   }
   // This state is the requested setpoint, not a measurement of the backlight.
   this->publish_state(value);
-  if (persist && this->restore_value_)
-    this->pref_.save(&value);
+  if (persist) {
+    this->parent_->notify_display_activity();
+    if (this->restore_value_) this->pref_.save(&value);
+  }
 }
 
 }
