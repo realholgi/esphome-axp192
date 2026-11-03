@@ -7,6 +7,7 @@ from esphome.const import CONF_ID,\
 CONF_CHARGING = "charging"
 
 DEPENDENCIES = ['i2c']
+AUTO_LOAD = ['binary_sensor']
 
 axp192_ns = cg.esphome_ns.namespace('axp192')
 AXP192Component = axp192_ns.class_('AXP192Component', cg.PollingComponent, i2c.I2CDevice)
