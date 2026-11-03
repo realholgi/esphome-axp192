@@ -27,6 +27,18 @@ constexpr uint32_t decode32(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
          (static_cast<uint32_t>(c) << 8) | d;
 }
 
+// LDO2 supplies the M5StickC/M5StickC Plus display backlight; preserve
+// all unrelated power-output enable bits in register 0x12.
+constexpr uint8_t set_ldo2_enabled(uint8_t power_control, bool enabled) {
+  return enabled ? static_cast<uint8_t>(power_control | 0x04u)
+                 : static_cast<uint8_t>(power_control & ~0x04u);
+}
+
+// Constrain user commands and possibly damaged restored preferences.
+constexpr float clamp_percent(float value) {
+  return value < 0.0f ? 0.0f : (value > 100.0f ? 100.0f : (value >= 0.0f ? value : 0.0f));
+}
+
 constexpr bool battery_present(uint8_t status) { return (status & 0x20) != 0; }
 constexpr bool charging(uint8_t status) { return (status & 0x40) != 0; }
 

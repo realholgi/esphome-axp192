@@ -12,6 +12,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 CPP = (ROOT / "components/axp192/axp192.cpp").read_text()
 PY = (ROOT / "components/axp192/sensor.py").read_text()
+NUMBER_PY = (ROOT / "components/axp192/number.py").read_text()
+HEADER = (ROOT / "components/axp192/axp192.h").read_text()
 
 
 def method_body(signature: str) -> str:
@@ -34,7 +36,7 @@ class SourceRegressions(unittest.TestCase):
         self.assertIn("i2c.i2c_device_schema(0x34)", PY)
 
     def test_binary_sensor_autoloaded(self):
-        self.assertRegex(PY, r"AUTO_LOAD\s*=\s*\[['\"]binary_sensor['\"]\]")
+        self.assertIn("AUTO_LOAD = ['binary_sensor', 'number']", PY)
 
     def test_status_flags_are_masked(self):
         self.assertIn("Read8bit(0x01) & 0x20", method_body("AXP192Component::GetBatState()"))
@@ -77,6 +79,37 @@ class SourceRegressions(unittest.TestCase):
         body = method_body("AXP192Component::begin(")
         self.assertIn("if (!TryRead8(0x12, &power))", body)
         self.assertIn("this->mark_failed()", body)
+
+    def test_m5stick_backlight_off_only_at_zero(self):
+        body = method_body("AXP192Component::UpdateBrightness()")
+        self.assertIn("brightness_ == 0.0f || curr_brightness_ == 0.0f", body)
+        self.assertIn("!SetLDO2(brightness_ > 0.0f)", body)
+        self.assertIn("curr_brightness_ = brightness_", body)
+        ldo2 = method_body("AXP192Component::SetLDO2(")
+        self.assertIn("if (!TryRead8(0x12, &power_control)) return false;", ldo2)
+        self.assertIn("detail::set_ldo2_enabled(power_control, enabled)", ldo2)
+        self.assertIn("desired == power_control || Write1Byte(0x12, desired)", ldo2)
+
+    def test_native_number_registration(self):
+        self.assertIn("AXP192BrightnessNumber", HEADER)
+        self.assertIn("number.register_number(var, config, min_value=0, max_value=100, step=1)", NUMBER_PY)
+        self.assertIn("cv.GenerateID(CONF_AXP192_ID): cv.use_id(AXP192Component)", NUMBER_PY)
+        self.assertIn("cv.Optional(CONF_RESTORE_VALUE, default=True)", NUMBER_PY)
+
+    def test_brightness_restoration_and_control(self):
+        setup = method_body("AXP192BrightnessNumber::setup()")
+        control = method_body("AXP192BrightnessNumber::control(float value)")
+        apply = method_body("AXP192BrightnessNumber::apply_value_(")
+        self.assertIn("this->pref_.load(&value)", setup)
+        self.assertIn("this->apply_value_(value, false)", setup)
+        self.assertIn("this->apply_value_(value, true)", control)
+        self.assertIn("this->parent_->set_brightness(value / 100.0f)", apply)
+        self.assertIn("this->parent_->apply_brightness()", apply)
+        self.assertIn("this->publish_state(value)", apply)
+        self.assertIn("this->pref_.save(&value)", apply)
+
+    def test_static_brightness_removed_from_sensor_schema(self):
+        self.assertNotIn("CONF_BRIGHTNESS", PY)
 
 
 if __name__ == "__main__":

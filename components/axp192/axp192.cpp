@@ -252,6 +252,10 @@ void AXP192Component::UpdateBrightness()
         uint8_t buf = 0;
         if (!TryRead8(0x28, &buf)) return;
         if (!Write1Byte(0x28, (buf & 0x0f) | (ubri << 4))) return;
+        // Only a requested zero brightness disables LDO2. Restore it if
+        // brightness is raised again. Default brightness remains unchanged.
+        if ((brightness_ == 0.0f || curr_brightness_ == 0.0f) &&
+            !SetLDO2(brightness_ > 0.0f)) return;
         break;
       }
       case AXP192_M5CORE2:
@@ -586,19 +590,11 @@ void AXP192Component::SetCoulombClear()
     Write1Byte(0xB8,0x20);
 }
 
-void AXP192Component::SetLDO2( bool State )
-{
-    uint8_t buf = 0;
-    if (!TryRead8(0x12, &buf)) return;
-    if( State == true )
-    {
-        buf = (1<<2) | buf;
-    }
-    else
-    {
-        buf = ~(1<<2) & buf;
-    }
-    Write1Byte( 0x12 , buf );
+bool AXP192Component::SetLDO2(bool enabled) {
+  uint8_t power_control = 0;
+  if (!TryRead8(0x12, &power_control)) return false;
+  const uint8_t desired = detail::set_ldo2_enabled(power_control, enabled);
+  return desired == power_control || Write1Byte(0x12, desired);
 }
 
 void AXP192Component::SetLDO3(bool State)
@@ -678,6 +674,36 @@ std::string AXP192Component::GetStartupReason() {
   return std::string{"RESET_UNKNOWN_REASON"};
 }
 
-}
+
+void AXP192BrightnessNumber::setup() {
+  float value = this->initial_value_;
+  if (this->restore_value_) {
+    this->pref_ = this->make_entity_preference<float>();
+    if (!this->pref_.load(&value))
+      value = this->initial_value_;
+  }
+  this->apply_value_(value, false);
 }
 
+void AXP192BrightnessNumber::dump_config() {
+  LOG_NUMBER("", "AXP192 display brightness", this);
+  ESP_LOGCONFIG(TAG, "  Restore value: %s", YESNO(this->restore_value_));
+}
+
+void AXP192BrightnessNumber::control(float value) {
+  this->apply_value_(value, true);
+}
+
+void AXP192BrightnessNumber::apply_value_(float value, bool persist) {
+  // Restoration and MQTT commands use the same 0-100% range.
+  value = detail::clamp_percent(value);
+  this->parent_->set_brightness(value / 100.0f);
+  this->parent_->apply_brightness();
+  // This state is the requested setpoint, not a measurement of the backlight.
+  this->publish_state(value);
+  if (persist && this->restore_value_)
+    this->pref_.save(&value);
+}
+
+}
+}
