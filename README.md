@@ -102,6 +102,38 @@ or number state unchanged; the command can be retried.
 See [the complete ESP-IDF example](sample-config/m5stickcplus-esp-idf.yaml)
 for the YAML syntax.
 
+### Automatic display backlight timeout
+
+Add `auto_off: 5min` to `switch: - platform: axp192` to turn the
+M5StickC backlight off after five minutes without a display command.
+By default there is **no automatic timeout**. A new ON command or a
+brightness adjustment while the display is on resets the countdown.
+Power-off keeps the brightness setpoint for the next wake-up.
+
+For example, button A can wake the screen without affecting the BLE
+gateway:
+
+```yaml
+switch:
+  - platform: axp192
+    id: display_enabled
+    axp192_id: axp_power
+    name: "Display Enabled"
+    auto_off: 5min
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO37
+      inverted: true
+    on_press:
+      - switch.turn_on: display_enabled
+```
+
+The auto-off action uses the normal switch path, so the OFF state is
+persisted when `restore_value: true` is enabled. A failed I2C write
+does not publish an incorrect OFF state.
+
 ### Verify a change
 
 Run the lightweight source regression tests without installing ESPHome:
