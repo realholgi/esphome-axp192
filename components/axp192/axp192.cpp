@@ -258,7 +258,7 @@ void AXP192Component::UpdateBrightness()
 
 bool AXP192Component::GetBatState()
 {
-    if( Read8bit(0x01) | 0x20 )
+    if( Read8bit(0x01) & 0x20 )
         return true;
     else
         return false;
@@ -266,8 +266,8 @@ bool AXP192Component::GetBatState()
 
 bool AXP192Component::GetChargingState()
 {
-    // reading 0x00 bit 6
-    if( (Read8bit(0x00) >> 5) & 0x01 )
+    // Charge-in-progress flag is bit 6 of register 0x01.
+    if( (Read8bit(0x01) & 0x40) != 0 )
         return true;
     else
         return false;
@@ -409,7 +409,7 @@ uint32_t AXP192Component::GetPowerbatData(void)
 {
     uint32_t power = 0;
     uint8_t buf[3];
-    ReadBuff(0x70,2,buf);
+    ReadBuff(0x70,3,buf);
     power = (buf[0] << 16) + (buf[1] << 8) + buf[2];
     return power;
 }
