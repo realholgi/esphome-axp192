@@ -144,39 +144,45 @@ void AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC,
 
 void AXP192Component::Write1Byte( uint8_t Addr ,  uint8_t Data )
 {
-    this->write_byte(Addr, Data);
+    if (!this->write_byte(Addr, Data)) {
+      ESP_LOGW(TAG, "I2C write failed at register 0x%02X", Addr);
+    }
 }
 
 uint8_t AXP192Component::Read8bit( uint8_t Addr )
 {
-    uint8_t data;
-    this->read_byte(Addr, &data);
+    uint8_t data = 0;
+    if (!this->read_byte(Addr, &data)) {
+      ESP_LOGW(TAG, "I2C read failed at register 0x%02X", Addr);
+    }
     return data;
 }
 
 uint16_t AXP192Component::Read12Bit( uint8_t Addr)
 {
     uint16_t Data = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(Addr,2,buf);
-    Data = ((buf[0] << 4) + buf[1]); //
+    Data = (static_cast<uint16_t>(buf[0]) << 4) | (buf[1] & 0x0F); //
     return Data;
 }
 
 uint16_t AXP192Component::Read13Bit( uint8_t Addr)
 {
     uint16_t Data = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(Addr,2,buf);
-    Data = ((buf[0] << 5) + buf[1]); //
+    Data = (static_cast<uint16_t>(buf[0]) << 5) | (buf[1] & 0x1F); //
     return Data;
 }
 
 uint16_t AXP192Component::Read16bit( uint8_t Addr )
 {
     uint32_t ReData = 0;
-    uint8_t Buff[2];
-    this->read_bytes(Addr, Buff, sizeof(Buff));
+    uint8_t Buff[2] = {};
+    if (!this->read_bytes(Addr, Buff, sizeof(Buff))) {
+      ESP_LOGW(TAG, "I2C block read failed at register 0x%02X", Addr);
+    }
     for( int i = 0 ; i < sizeof(Buff) ; i++ )
     {
         ReData <<= 8;
@@ -188,7 +194,7 @@ uint16_t AXP192Component::Read16bit( uint8_t Addr )
 uint32_t AXP192Component::Read24bit( uint8_t Addr )
 {
     uint32_t ReData = 0;
-    uint8_t Buff[3];
+    uint8_t Buff[3] = {};
     this->read_bytes(Addr, Buff, sizeof(Buff));
     for( int i = 0 ; i < sizeof(Buff) ; i++ )
     {
@@ -201,7 +207,7 @@ uint32_t AXP192Component::Read24bit( uint8_t Addr )
 uint32_t AXP192Component::Read32bit( uint8_t Addr )
 {
     uint32_t ReData = 0;
-    uint8_t Buff[4];
+    uint8_t Buff[4] = {};
     this->read_bytes(Addr, Buff, sizeof(Buff));
     for( int i = 0 ; i < sizeof(Buff) ; i++ )
     {
@@ -213,7 +219,9 @@ uint32_t AXP192Component::Read32bit( uint8_t Addr )
 
 void AXP192Component::ReadBuff( uint8_t Addr , uint8_t Size , uint8_t *Buff )
 {
-    this->read_bytes(Addr, Buff, Size);
+    if (!this->read_bytes(Addr, Buff, Size)) {
+      ESP_LOGW(TAG, "I2C block read failed at register 0x%02X", Addr);
+    }
 }
 
 void AXP192Component::UpdateBrightness()
@@ -336,7 +344,7 @@ float AXP192Component::GetCoulombData(void)
 uint16_t AXP192Component::GetVbatData(void){
 
     uint16_t vbat = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x78,2,buf);
     vbat = ((buf[0] << 4) + buf[1]); // V
     return vbat;
@@ -345,7 +353,7 @@ uint16_t AXP192Component::GetVbatData(void){
 uint16_t AXP192Component::GetVinData(void)
 {
     uint16_t vin = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x56,2,buf);
     vin = ((buf[0] << 4) + buf[1]); // V
     return vin;
@@ -354,7 +362,7 @@ uint16_t AXP192Component::GetVinData(void)
 uint16_t AXP192Component::GetIinData(void)
 {
     uint16_t iin = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x58,2,buf);
     iin = ((buf[0] << 4) + buf[1]);
     return iin;
@@ -363,7 +371,7 @@ uint16_t AXP192Component::GetIinData(void)
 uint16_t AXP192Component::GetVusbinData(void)
 {
     uint16_t vin = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x5a,2,buf);
     vin = ((buf[0] << 4) + buf[1]); // V
     return vin;
@@ -372,7 +380,7 @@ uint16_t AXP192Component::GetVusbinData(void)
 uint16_t AXP192Component::GetIusbinData(void)
 {
     uint16_t iin = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x5C,2,buf);
     iin = ((buf[0] << 4) + buf[1]);
     return iin;
@@ -381,7 +389,7 @@ uint16_t AXP192Component::GetIusbinData(void)
 uint16_t AXP192Component::GetIchargeData(void)
 {
     uint16_t icharge = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x7A,2,buf);
     icharge = ( buf[0] << 5 ) + buf[1] ;
     return icharge;
@@ -390,7 +398,7 @@ uint16_t AXP192Component::GetIchargeData(void)
 uint16_t AXP192Component::GetIdischargeData(void)
 {
     uint16_t idischarge = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x7C,2,buf);
     idischarge = ( buf[0] << 5 ) + buf[1] ;
     return idischarge;
@@ -399,7 +407,7 @@ uint16_t AXP192Component::GetIdischargeData(void)
 uint16_t AXP192Component::GetTempData(void)
 {
     uint16_t temp = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x5e,2,buf);
     temp = ((buf[0] << 4) + buf[1]);
     return temp;
@@ -408,7 +416,7 @@ uint16_t AXP192Component::GetTempData(void)
 uint32_t AXP192Component::GetPowerbatData(void)
 {
     uint32_t power = 0;
-    uint8_t buf[3];
+    uint8_t buf[3] = {};
     ReadBuff(0x70,3,buf);
     power = (buf[0] << 16) + (buf[1] << 8) + buf[2];
     return power;
@@ -417,7 +425,7 @@ uint32_t AXP192Component::GetPowerbatData(void)
 uint16_t AXP192Component::GetVapsData(void)
 {
     uint16_t vaps = 0;
-    uint8_t buf[2];
+    uint8_t buf[2] = {};
     ReadBuff(0x7e,2,buf);
     vaps = ((buf[0] << 4) + buf[1]);
     return vaps;
