@@ -58,18 +58,23 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          source = Path("sample-config/m5stickcplus-esp-idf.yaml").read_text()
           original = "  - source: github://realholgi/esphome-axp192@main"
           replacement = "  - source:\\n      type: local\\n      path: components".replace("\\n", "\n")
-          assert source.count(original) == 1, "Example must reference the AXP192 component once"
-          Path("ci-m5stickcplus.yaml").write_text(source.replace(original, replacement))
+          for src in sorted(Path("sample-config").glob("*.yaml")):
+              source = src.read_text()
+              assert source.count(original) == 1, f"{src}: expected exactly one AXP192 source"
+              Path(f"ci-{src.name}").write_text(source.replace(original, replacement))
           Path("secrets.yaml").write_text(
               'wifi_ssid: "ci-test"\\nwifi_password: "ci-not-a-real-password"\\n'.replace("\\n", "\n")
           )
           PY
 
-      - name: Validate firmware configuration
-        run: esphome config ci-m5stickcplus.yaml
+      - name: Validate all device examples
+        shell: bash
+        run: |
+          for example in ci-*.yaml; do
+            esphome config "$example"
+          done
 
-      - name: Compile firmware
-        run: esphome compile ci-m5stickcplus.yaml
+      - name: Compile M5StickC Plus firmware
+        run: esphome compile ci-m5stickcplus-esp-idf.yaml
