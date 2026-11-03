@@ -19,6 +19,30 @@ This custom component it to implement support for the AXP192 for both the M5Stic
 
 Copy the components to a custom_components directory next to your .yaml configuration file, or include directly from this repository.
 
+
+## ESPHome 2026 / ESP-IDF quick start
+
+For the M5StickC Plus, see [the minimal ESP-IDF example](sample-config/m5stickcplus-esp-idf.yaml).
+It uses the `m5stick-c` board definition, native ESP-IDF, and I2C pins GPIO21/GPIO22.
+
+The AXP192 device's default I2C address is `0x34`. You may omit
+`address: 0x34` from the component's YAML. The legacy examples under
+`sample-config/` are historical and may use outdated ESPHome syntax.
+
+The `charging` entity reports the AXP192 charge-in-progress flag, *not* merely
+whether USB power is connected. The `battery_level` sensor is a rough
+voltage-based estimate, clamped to 0–100%, not a calibrated fuel gauge. After
+an I2C read failure, the last value is retained until a successful read.
+
+### Verify a change
+
+Run `esphome config sample-config/m5stickcplus-esp-idf.yaml` and
+`esphome compile sample-config/m5stickcplus-esp-idf.yaml` with ESPHome
+2026.10 or newer. Provide `wifi_ssid` and `wifi_password` via a
+`secrets.yaml` alongside the example. Hardware validation on a real
+M5StickC Plus is still necessary to verify battery/charging and display
+power behavior.
+
 ## Configuration
 
 Sample configurations are found in the `/sample-config` folder.
@@ -29,7 +53,7 @@ This component adds a new model configuration to the AXP192 sensor which determi
 
 ```yaml
 external_components:
-  - source: github://martydingo/esphome-axp192
+  - source: github://realholgi/esphome-axp192@main
     components: [axp192]
 ```
 
