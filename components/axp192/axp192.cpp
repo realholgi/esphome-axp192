@@ -1,7 +1,6 @@
 #include "axp192.h"
 #include "axp192_math.h"
 #include "esphome/core/log.h"
-#include "esp_sleep.h"
 #include "esp_system.h"
 
 namespace esphome {
@@ -21,7 +20,7 @@ void AXP192Component::setup() {
       break;
     case AXP192_M5TOUGH:
       ok = this->begin(false, false, false, false, false);
-      if (ok && GetStartupReason() == "ESP_RST_POWERON") {
+      if (ok && ::esp_reset_reason() == ESP_RST_POWERON) {
         ESP_LOGD(TAG, "First power on, restarting ESP...");
         esp_restart();
       }
@@ -120,18 +119,10 @@ bool AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC,
         break;
     }
     case AXP192_M5CORE2:
-    {
-        // Set DCDC3 (TFT_LED & TFT) 3.0V
-        if (!Write1Byte(0x27, 0xcc)) return false;
-        // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
-        if (!Write1Byte(0x28, 0xcc)) return false;
-        break;
-    }
     case AXP192_M5TOUGH:
     {
-        // Set DCDC3 (TFT_LED & TFT) 3.0V
+        // Both devices use DCDC3 for backlight and LDO outputs for TFT.
         if (!Write1Byte(0x27, 0xcc)) return false;
-        // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
         if (!Write1Byte(0x28, 0xcc)) return false;
         break;
     }
@@ -241,12 +232,6 @@ bool AXP192Component::UpdateBrightness()
         break;
       }
       case AXP192_M5CORE2:
-      {
-        uint8_t buf = 0;
-        if (!TryRead8(0x27, &buf)) return false;
-        if (!Write1Byte(0x27, (buf & 0x80) | (ubri << 3))) return false;
-        break;
-      }
       case AXP192_M5TOUGH:
       {
         uint8_t buf = 0;
@@ -265,50 +250,6 @@ bool AXP192Component::SetLDO2(bool enabled) {
   const uint8_t desired = detail::set_ldo2_enabled(power_control, enabled);
   return desired == power_control || Write1Byte(0x12, desired);
 }
-
-std::string AXP192Component::GetStartupReason() {
-  esp_reset_reason_t reset_reason = ::esp_reset_reason();
-  if (reset_reason == ESP_RST_DEEPSLEEP) {
-    esp_sleep_source_t wake_reason = esp_sleep_get_wakeup_cause();
-    if (wake_reason == ESP_SLEEP_WAKEUP_EXT0)
-      return "ESP_SLEEP_WAKEUP_EXT0";
-    if (wake_reason == ESP_SLEEP_WAKEUP_EXT1)
-      return "ESP_SLEEP_WAKEUP_EXT1";
-    if (wake_reason == ESP_SLEEP_WAKEUP_TIMER)
-      return "ESP_SLEEP_WAKEUP_TIMER";
-    if (wake_reason == ESP_SLEEP_WAKEUP_TOUCHPAD)
-      return "ESP_SLEEP_WAKEUP_TOUCHPAD";
-    if (wake_reason == ESP_SLEEP_WAKEUP_ULP)
-      return "ESP_SLEEP_WAKEUP_ULP";
-    if (wake_reason == ESP_SLEEP_WAKEUP_GPIO)
-      return "ESP_SLEEP_WAKEUP_GPIO";
-    if (wake_reason == ESP_SLEEP_WAKEUP_UART)
-      return "ESP_SLEEP_WAKEUP_UART";
-    return std::string{"WAKEUP_UNKNOWN_REASON"};
-  }
-
-  if (reset_reason == ESP_RST_UNKNOWN)
-    return "ESP_RST_UNKNOWN";
-  if (reset_reason == ESP_RST_POWERON)
-    return "ESP_RST_POWERON";
-  if (reset_reason == ESP_RST_SW)
-    return "ESP_RST_SW";
-  if (reset_reason == ESP_RST_PANIC)
-    return "ESP_RST_PANIC";
-  if (reset_reason == ESP_RST_INT_WDT)
-    return "ESP_RST_INT_WDT";
-  if (reset_reason == ESP_RST_TASK_WDT)
-    return "ESP_RST_TASK_WDT";
-  if (reset_reason == ESP_RST_WDT)
-    return "ESP_RST_WDT";
-  if (reset_reason == ESP_RST_BROWNOUT)
-    return "ESP_RST_BROWNOUT";
-  if (reset_reason == ESP_RST_SDIO)
-    return "ESP_RST_SDIO";
-  return std::string{"RESET_UNKNOWN_REASON"};
-}
-
-
 
 void AXP192DisplaySwitch::setup() {
   bool value = this->initial_value_;
