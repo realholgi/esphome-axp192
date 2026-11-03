@@ -42,7 +42,7 @@ class SourceRegressions(unittest.TestCase):
 
     def test_power_adc_reads_three_bytes(self):
         body = method_body("AXP192Component::GetPowerbatData(void)")
-        self.assertIn("ReadBuff(0x70,3,buf)", body)
+        self.assertIn("if (!ReadBuff(0x70, 3, buf)) return 0;", body)
 
     def test_adc_low_bits_are_masked(self):
         self.assertIn("detail::decode12(buf[0], buf[1])", method_body("AXP192Component::Read12Bit("))
@@ -60,6 +60,23 @@ class SourceRegressions(unittest.TestCase):
     def test_coulomb_difference_is_signed(self):
         body = method_body("AXP192Component::GetCoulombData(void)")
         self.assertIn("detail::coulomb_mAh(coin, coout)", body)
+
+
+    def test_i2c_read_errors_are_reported(self):
+        self.assertIn("bool AXP192Component::TryRead8", CPP)
+        self.assertIn("bool AXP192Component::ReadBuff", CPP)
+        self.assertIn("if (!ReadBuff(Addr, sizeof(Buff), Buff)) return 0;", CPP)
+
+    def test_brightness_preserves_register_on_failed_read(self):
+        body = method_body("AXP192Component::UpdateBrightness()")
+        self.assertIn("if (!TryRead8(0x28, &buf)) return;", body)
+        self.assertIn("if (!TryRead8(0x27, &buf)) return;", body)
+        self.assertIn("curr_brightness_ = brightness_", body)
+
+    def test_power_register_read_is_guarded(self):
+        body = method_body("AXP192Component::begin(")
+        self.assertIn("if (!TryRead8(0x12, &power))", body)
+        self.assertIn("this->mark_failed()", body)
 
 
 if __name__ == "__main__":
