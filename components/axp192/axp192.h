@@ -36,6 +36,7 @@ class AXP192Component : public PollingComponent, public i2c::I2CDevice {
 public:
   void set_batterylevel_sensor(sensor::Sensor *batterylevel_sensor) { batterylevel_sensor_ = batterylevel_sensor; }
   void set_charging_sensor(binary_sensor::BinarySensor *charging_sensor) { charging_sensor_ = charging_sensor; }
+  void set_i2c_errors_sensor(sensor::Sensor *value) { i2c_errors_sensor_ = value; }
   void set_usb_connected_sensor(binary_sensor::BinarySensor *value) { usb_connected_sensor_ = value; }
   void set_battery_voltage_sensor(sensor::Sensor *value) { battery_voltage_sensor_ = value; }
   void set_battery_charge_current_sensor(sensor::Sensor *value) { battery_charge_current_sensor_ = value; }
@@ -43,10 +44,11 @@ public:
   void set_usb_voltage_sensor(sensor::Sensor *value) { usb_voltage_sensor_ = value; }
   void set_usb_current_sensor(sensor::Sensor *value) { usb_current_sensor_ = value; }
   void set_brightness(float brightness) { brightness_ = brightness; }
-  void apply_brightness() { this->UpdateBrightness(); }
-  void set_display_enabled(bool enabled) {
+  bool apply_brightness() { return this->UpdateBrightness(); }
+  float get_brightness() const { return brightness_; }
+  bool set_display_enabled(bool enabled) {
     this->display_enabled_ = enabled;
-    this->UpdateBrightness();
+    return this->UpdateBrightness();
   }
   void set_model(AXP192Model model) { this->model_ = model; }
   void set_battery_curve_lipo(bool enabled) { this->battery_curve_lipo_ = enabled; }
@@ -65,6 +67,9 @@ private:
 protected:
     sensor::Sensor *batterylevel_sensor_;
     binary_sensor::BinarySensor *charging_sensor_;
+    sensor::Sensor *i2c_errors_sensor_{nullptr};
+    uint32_t i2c_error_count_{0};
+    void record_i2c_error_();
     binary_sensor::BinarySensor *usb_connected_sensor_{nullptr};
     sensor::Sensor *battery_voltage_sensor_{nullptr};
     sensor::Sensor *battery_charge_current_sensor_{nullptr};
@@ -93,7 +98,7 @@ protected:
      */
 
     void  begin(bool disableLDO2 = false, bool disableLDO3 = false, bool disableRTC = false, bool disableDCDC1 = false, bool disableDCDC3 = false);
-    void  UpdateBrightness();
+    bool UpdateBrightness();
     bool  GetBatState();
     bool  GetChargingState();
     uint8_t  GetBatData();

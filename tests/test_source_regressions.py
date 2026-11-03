@@ -118,6 +118,18 @@ class SourceRegressions(unittest.TestCase):
         self.assertIn("this->parent_->set_display_enabled(state)", CPP)
         self.assertIn("this->parent_->set_brightness(value / 100.0f)", CPP)
 
+    def test_i2c_errors_are_counted(self):
+        self.assertIn("record_i2c_error_()", CPP)
+        self.assertIn("i2c_error_count_++", CPP)
+        self.assertIn("set_i2c_errors_sensor", HEADER)
+
+    def test_brightness_not_published_on_write_failure(self):
+        control = method_body("AXP192BrightnessNumber::apply_value_(")
+        self.assertIn("if (!this->parent_->apply_brightness())", control)
+        self.assertIn("this->parent_->set_brightness(previous)", control)
+        switch = method_body("AXP192DisplaySwitch::write_state(")
+        self.assertIn("if (!this->parent_->set_display_enabled(state))", switch)
+
 
 if __name__ == "__main__":
     unittest.main()
