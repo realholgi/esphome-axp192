@@ -114,7 +114,12 @@ void AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC,
     Write1Byte(0x33, 0xc0);
 
     // Depending on configuration enable LDO2, LDO3, DCDC1, DCDC3.
-    uint8_t buf = (Read8bit(0x12) & 0xef) | 0x4D;
+    uint8_t power = 0;
+    if (!TryRead8(0x12, &power)) {
+      this->mark_failed();
+      return;
+    }
+    uint8_t buf = (power & 0xef) | 0x4D;
     if(disableLDO3) buf &= ~(1<<3);
     if(disableLDO2) buf &= ~(1<<2);
     if(disableDCDC3) buf &= ~(1<<1);
@@ -147,27 +152,36 @@ void AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC,
 
 }
 
-void AXP192Component::Write1Byte( uint8_t Addr ,  uint8_t Data )
-{
-    if (!this->write_byte(Addr, Data)) {
-      ESP_LOGW(TAG, "I2C write failed at register 0x%02X", Addr);
-    }
+bool AXP192Component::Write1Byte(uint8_t addr, uint8_t data) {
+  if (!this->write_byte(addr, data)) {
+    ESP_LOGW(TAG, "I2C write failed at register 0x%02X", addr);
+    this->status_set_warning();
+    return false;
+  }
+  return true;
 }
 
-uint8_t AXP192Component::Read8bit( uint8_t Addr )
-{
-    uint8_t data = 0;
-    if (!this->read_byte(Addr, &data)) {
-      ESP_LOGW(TAG, "I2C read failed at register 0x%02X", Addr);
-    }
-    return data;
+bool AXP192Component::TryRead8(uint8_t addr, uint8_t *data) {
+  *data = 0;
+  if (!this->read_byte(addr, data)) {
+    ESP_LOGW(TAG, "I2C read failed at register 0x%02X", addr);
+    this->status_set_warning();
+    return false;
+  }
+  return true;
+}
+
+uint8_t AXP192Component::Read8bit(uint8_t addr) {
+  uint8_t value = 0;
+  this->TryRead8(addr, &value);
+  return value;
 }
 
 uint16_t AXP192Component::Read12Bit( uint8_t Addr)
 {
     uint16_t Data = 0;
     uint8_t buf[2] = {};
-    ReadBuff(Addr,2,buf);
+    if (!ReadBuff(Addr, 2, buf)) return 0;
     Data = detail::decode12(buf[0], buf[1]);
     return Data;
 }
@@ -176,7 +190,7 @@ uint16_t AXP192Component::Read13Bit( uint8_t Addr)
 {
     uint16_t Data = 0;
     uint8_t buf[2] = {};
-    ReadBuff(Addr,2,buf);
+    if (!ReadBuff(Addr, 2, buf)) return 0;
     Data = detail::decode13(buf[0], buf[1]);
     return Data;
 }
@@ -185,9 +199,7 @@ uint16_t AXP192Component::Read16bit( uint8_t Addr )
 {
     uint32_t ReData = 0;
     uint8_t Buff[2] = {};
-    if (!this->read_bytes(Addr, Buff, sizeof(Buff))) {
-      ESP_LOGW(TAG, "I2C block read failed at register 0x%02X", Addr);
-    }
+    if (!ReadBuff(Addr, sizeof(Buff), Buff)) return 0;
     return detail::decode16(Buff[0], Buff[1]);
 }
 
@@ -195,7 +207,7 @@ uint32_t AXP192Component::Read24bit( uint8_t Addr )
 {
     uint32_t ReData = 0;
     uint8_t Buff[3] = {};
-    this->read_bytes(Addr, Buff, sizeof(Buff));
+    if (!ReadBuff(Addr, sizeof(Buff), Buff)) return 0;
     return detail::decode24(Buff[0], Buff[1], Buff[2]);
 }
 
@@ -203,15 +215,17 @@ uint32_t AXP192Component::Read32bit( uint8_t Addr )
 {
     uint32_t ReData = 0;
     uint8_t Buff[4] = {};
-    this->read_bytes(Addr, Buff, sizeof(Buff));
+    if (!ReadBuff(Addr, sizeof(Buff), Buff)) return 0;
     return detail::decode32(Buff[0], Buff[1], Buff[2], Buff[3]);
 }
 
-void AXP192Component::ReadBuff( uint8_t Addr , uint8_t Size , uint8_t *Buff )
-{
-    if (!this->read_bytes(Addr, Buff, Size)) {
-      ESP_LOGW(TAG, "I2C block read failed at register 0x%02X", Addr);
-    }
+bool AXP192Component::ReadBuff(uint8_t addr, uint8_t size, uint8_t *buffer) {
+  if (!this->read_bytes(addr, buffer, size)) {
+    ESP_LOGW(TAG, "I2C block read failed at register 0x%02X", addr);
+    this->status_set_warning();
+    return false;
+  }
+  return true;
 }
 
 void AXP192Component::UpdateBrightness()
@@ -222,7 +236,7 @@ void AXP192Component::UpdateBrightness()
     }
 
     ESP_LOGD(TAG, "Brightness=%f (Curr: %f)", brightness_, curr_brightness_);
-    curr_brightness_ = brightness_;
+    // Record the requested level only after the write succeeds.
 
     const uint8_t c_min = 7;
     const uint8_t c_max = 12;
@@ -235,23 +249,27 @@ void AXP192Component::UpdateBrightness()
     switch (this->model_) {
       case AXP192_M5STICKC:
       {
-        uint8_t buf = Read8bit( 0x28 );
-        Write1Byte( 0x28 , ((buf & 0x0f) | (ubri << 4)) );
+        uint8_t buf = 0;
+        if (!TryRead8(0x28, &buf)) return;
+        if (!Write1Byte(0x28, (buf & 0x0f) | (ubri << 4))) return;
         break;
       }
       case AXP192_M5CORE2:
       {
-        uint8_t buf = Read8bit( 0x27 );
-        Write1Byte( 0x27 , ((buf & 0x80) | (ubri << 3)) );
+        uint8_t buf = 0;
+        if (!TryRead8(0x27, &buf)) return;
+        if (!Write1Byte(0x27, (buf & 0x80) | (ubri << 3))) return;
         break;
       }
       case AXP192_M5TOUGH:
       {
-        uint8_t buf = Read8bit( 0x27 );
-        Write1Byte( 0x27 , ((buf & 0x80) | (ubri << 3)) );
+        uint8_t buf = 0;
+        if (!TryRead8(0x27, &buf)) return;
+        if (!Write1Byte(0x27, (buf & 0x80) | (ubri << 3))) return;
         break;
       }
     }
+    curr_brightness_ = brightness_;
 }
 
 bool AXP192Component::GetBatState()
@@ -335,7 +353,7 @@ uint16_t AXP192Component::GetVbatData(void){
 
     uint16_t vbat = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x78,2,buf);
+    if (!ReadBuff(0x78, 2, buf)) return 0;
     vbat = ((buf[0] << 4) + buf[1]); // V
     return vbat;
 }
@@ -344,7 +362,7 @@ uint16_t AXP192Component::GetVinData(void)
 {
     uint16_t vin = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x56,2,buf);
+    if (!ReadBuff(0x56, 2, buf)) return 0;
     vin = ((buf[0] << 4) + buf[1]); // V
     return vin;
 }
@@ -353,7 +371,7 @@ uint16_t AXP192Component::GetIinData(void)
 {
     uint16_t iin = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x58,2,buf);
+    if (!ReadBuff(0x58, 2, buf)) return 0;
     iin = ((buf[0] << 4) + buf[1]);
     return iin;
 }
@@ -362,7 +380,7 @@ uint16_t AXP192Component::GetVusbinData(void)
 {
     uint16_t vin = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x5a,2,buf);
+    if (!ReadBuff(0x5a, 2, buf)) return 0;
     vin = ((buf[0] << 4) + buf[1]); // V
     return vin;
 }
@@ -371,7 +389,7 @@ uint16_t AXP192Component::GetIusbinData(void)
 {
     uint16_t iin = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x5C,2,buf);
+    if (!ReadBuff(0x5C, 2, buf)) return 0;
     iin = ((buf[0] << 4) + buf[1]);
     return iin;
 }
@@ -380,7 +398,7 @@ uint16_t AXP192Component::GetIchargeData(void)
 {
     uint16_t icharge = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x7A,2,buf);
+    if (!ReadBuff(0x7A, 2, buf)) return 0;
     icharge = ( buf[0] << 5 ) + buf[1] ;
     return icharge;
 }
@@ -389,7 +407,7 @@ uint16_t AXP192Component::GetIdischargeData(void)
 {
     uint16_t idischarge = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x7C,2,buf);
+    if (!ReadBuff(0x7C, 2, buf)) return 0;
     idischarge = ( buf[0] << 5 ) + buf[1] ;
     return idischarge;
 }
@@ -398,7 +416,7 @@ uint16_t AXP192Component::GetTempData(void)
 {
     uint16_t temp = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x5e,2,buf);
+    if (!ReadBuff(0x5e, 2, buf)) return 0;
     temp = ((buf[0] << 4) + buf[1]);
     return temp;
 }
@@ -407,7 +425,7 @@ uint32_t AXP192Component::GetPowerbatData(void)
 {
     uint32_t power = 0;
     uint8_t buf[3] = {};
-    ReadBuff(0x70,3,buf);
+    if (!ReadBuff(0x70, 3, buf)) return 0;
     power = (buf[0] << 16) + (buf[1] << 8) + buf[2];
     return power;
 }
@@ -416,17 +434,20 @@ uint16_t AXP192Component::GetVapsData(void)
 {
     uint16_t vaps = 0;
     uint8_t buf[2] = {};
-    ReadBuff(0x7e,2,buf);
+    if (!ReadBuff(0x7e, 2, buf)) return 0;
     vaps = ((buf[0] << 4) + buf[1]);
     return vaps;
 }
 
 void AXP192Component::SetSleep(void)
 {
-    Write1Byte(0x31 , Read8bit(0x31) | ( 1 << 3)); // Power off voltag 3.0v
-    Write1Byte(0x90 , Read8bit(0x90) | 0x07); // GPIO1 floating
-    Write1Byte(0x82, 0x00); // Disable ADCs
-    Write1Byte(0x12, Read8bit(0x12) & 0xA1); // Disable all outputs but DCDC1
+    uint8_t v31 = 0, v90 = 0, v12 = 0;
+    if (!TryRead8(0x31, &v31) || !TryRead8(0x90, &v90) ||
+        !TryRead8(0x12, &v12)) return;
+    if (!Write1Byte(0x31, v31 | (1 << 3))) return;
+    if (!Write1Byte(0x90, v90 | 0x07)) return;
+    if (!Write1Byte(0x82, 0x00)) return;
+    Write1Byte(0x12, v12 & 0xA1);
 }
 
 // -- sleep
@@ -461,7 +482,8 @@ void AXP192Component::LightSleep(uint64_t time_in_us)
 // 0 not press, 0x01 long press, 0x02 press
 uint8_t AXP192Component::GetBtnPress()
 {
-    uint8_t state = Read8bit(0x46);
+    uint8_t state = 0;
+    if (!TryRead8(0x46, &state)) return 0;
     if(state)
     {
         Write1Byte( 0x46 , 0x03 );
@@ -566,7 +588,8 @@ void AXP192Component::SetCoulombClear()
 
 void AXP192Component::SetLDO2( bool State )
 {
-    uint8_t buf = Read8bit(0x12);
+    uint8_t buf = 0;
+    if (!TryRead8(0x12, &buf)) return;
     if( State == true )
     {
         buf = (1<<2) | buf;
@@ -580,7 +603,8 @@ void AXP192Component::SetLDO2( bool State )
 
 void AXP192Component::SetLDO3(bool State)
 {
-    uint8_t buf = Read8bit(0x12);
+    uint8_t buf = 0;
+    if (!TryRead8(0x12, &buf)) return;
     if( State == true )
     {
         buf = (1<<3) | buf;
@@ -594,14 +618,17 @@ void AXP192Component::SetLDO3(bool State)
 
 void AXP192Component::SetChargeCurrent(uint8_t current)
 {
-    uint8_t buf = Read8bit(0x33);
+    uint8_t buf = 0;
+    if (!TryRead8(0x33, &buf)) return;
     buf = (buf & 0xf0) | (current & 0x07);
     Write1Byte(0x33, buf);
 }
 
 void AXP192Component::PowerOff()
 {
-    Write1Byte(0x32, Read8bit(0x32) | 0x80);
+    uint8_t value = 0;
+    if (!TryRead8(0x32, &value)) return;
+    Write1Byte(0x32, value | 0x80);
 }
 
 void AXP192Component::SetAdcState(bool state)
