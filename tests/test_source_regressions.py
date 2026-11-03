@@ -45,8 +45,8 @@ class SourceRegressions(unittest.TestCase):
         self.assertIn("ReadBuff(0x70,3,buf)", body)
 
     def test_adc_low_bits_are_masked(self):
-        self.assertIn("buf[1] & 0x0F", method_body("AXP192Component::Read12Bit("))
-        self.assertIn("buf[1] & 0x1F", method_body("AXP192Component::Read13Bit("))
+        self.assertIn("detail::decode12(buf[0], buf[1])", method_body("AXP192Component::Read12Bit("))
+        self.assertIn("detail::decode13(buf[0], buf[1])", method_body("AXP192Component::Read13Bit("))
 
     def test_sensor_publish_requires_successful_read(self):
         body = method_body("AXP192Component::update()")
@@ -55,12 +55,11 @@ class SourceRegressions(unittest.TestCase):
 
     def test_battery_estimate_is_clamped(self):
         body = method_body("AXP192Component::update()")
-        self.assertIn("battery_level > 100.0f", body)
-        self.assertIn("battery_level < 0.0f", body)
+        self.assertIn("detail::battery_level(vbat)", body)
 
     def test_coulomb_difference_is_signed(self):
         body = method_body("AXP192Component::GetCoulombData(void)")
-        self.assertIn("static_cast<double>(coin) - static_cast<double>(coout)", body)
+        self.assertIn("detail::coulomb_mAh(coin, coout)", body)
 
 
 if __name__ == "__main__":

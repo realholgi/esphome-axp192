@@ -30,3 +30,9 @@ jobs:
 
       - name: Run source regression tests
         run: python -m unittest discover -s tests -v
+
+      - name: Build native C++ unit tests
+        run: c++ -std=c++17 -Wall -Wextra -Werror -pedantic -I. tests/test_axp192_math.cpp -o /tmp/axp192_math_tests
+
+      - name: Run native C++ unit tests
+        run: /tmp/axp192_math_tests
