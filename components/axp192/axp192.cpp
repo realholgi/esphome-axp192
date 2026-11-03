@@ -49,15 +49,13 @@ float AXP192Component::get_setup_priority() const { return setup_priority::DATA;
 void AXP192Component::update() {
 
     if (this->batterylevel_sensor_ != nullptr) {
-      // To be fixed
-      // This is not giving the right value - mostly there to have some sample sensor...
+      // Voltage-only approximation; not a calibrated fuel gauge.
       float vbat = GetBatVoltage();
-      float batterylevel = 100.0 * ((vbat - 3.0) / (4.1 - 3.0));
+      float batterylevel = 100.0f * ((vbat - 3.0f) / (4.1f - 3.0f));
 
       ESP_LOGD(TAG, "Got Battery Level=%f (%f)", batterylevel, vbat);
-      if (batterylevel > 100.) {
-        batterylevel = 100;
-      }
+      if (batterylevel > 100.0f) batterylevel = 100.0f;
+      if (batterylevel < 0.0f) batterylevel = 0.0f;
       this->batterylevel_sensor_->publish_state(batterylevel);
     }
 
@@ -335,7 +333,7 @@ float AXP192Component::GetCoulombData(void)
 
   //c = 65536 * current_LSB * (coin - coout) / 3600 / ADC rate
   //Adc rate can be read from 84H ,change this variable if you change the ADC reate
-  float ccc = 65536 * 0.5 * (coin - coout) / 3600.0 / 25.0;
+  float ccc = 65536.0 * 0.5 * (static_cast<double>(coin) - static_cast<double>(coout)) / 3600.0 / 200.0;
   return ccc;
 
 }
@@ -496,7 +494,7 @@ float AXP192Component::GetBatCurrent()
     float ADCLSB = 0.5;
     uint16_t CurrentIn = Read13Bit( 0x7A );
     uint16_t CurrentOut = Read13Bit( 0x7C );
-    return ( CurrentIn - CurrentOut ) * ADCLSB;
+    return (static_cast<float>(CurrentIn) - static_cast<float>(CurrentOut)) * ADCLSB;
 }
 
 float AXP192Component::GetVinVoltage()
@@ -560,13 +558,13 @@ float AXP192Component::GetAPSVoltage()
 float AXP192Component::GetBatCoulombInput()
 {
     uint32_t ReData = Read32bit( 0xB0 );
-    return ReData * 65536 * 0.5 / 3600 /25.0;
+    return ReData * 65536.0 * 0.5 / 3600.0 / 200.0;
 }
 
 float AXP192Component::GetBatCoulombOut()
 {
     uint32_t ReData = Read32bit( 0xB4 );
-    return ReData * 65536 * 0.5 / 3600 /25.0;
+    return ReData * 65536.0 * 0.5 / 3600.0 / 200.0;
 }
 
 void AXP192Component::SetCoulombClear()
@@ -623,8 +621,6 @@ std::string AXP192Component::GetStartupReason() {
   esp_reset_reason_t reset_reason = ::esp_reset_reason();
   if (reset_reason == ESP_RST_DEEPSLEEP) {
     esp_sleep_source_t wake_reason = esp_sleep_get_wakeup_cause();
-    if (wake_reason == ESP_SLEEP_WAKEUP_EXT0)
-      return "ESP_SLEEP_WAKEUP_EXT0";
     if (wake_reason == ESP_SLEEP_WAKEUP_EXT0)
       return "ESP_SLEEP_WAKEUP_EXT0";
     if (wake_reason == ESP_SLEEP_WAKEUP_EXT1)
