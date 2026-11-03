@@ -34,6 +34,29 @@ whether USB power is connected. The `battery_level` sensor is a rough
 voltage-based estimate, clamped to 0–100%, not a calibrated fuel gauge. After
 an I2C read failure, the last value is retained until a successful read.
 
+### M5StickC / M5StickC Plus backlight power
+
+For `model: M5STICKC`, setting `brightness: 0%` turns the display
+**backlight supply (AXP192 LDO2)** completely off, instead of leaving it
+at the minimum brightness voltage. The TFT controller's supply is not
+intentionally disabled. The default is still `brightness: 100%`; settings
+greater than zero retain the original dimming behavior.
+
+```yaml
+sensor:
+  - platform: axp192
+    model: M5STICKC
+    i2c_id: bus_a
+    brightness: 0%  # Optional: turn off the backlight supply
+    battery_level:
+      name: "M5Stick Battery Level"
+```
+
+This feature applies to `M5STICKC` only, not `M5CORE2` or `M5TOUGH`.
+Changes to the requested brightness in component code can re-enable
+the backlight. I2C errors prevent the brightness transition from being
+marked as successful, allowing a subsequent poll to retry it.
+
 ### Verify a change
 
 Run the lightweight source regression tests without installing ESPHome:

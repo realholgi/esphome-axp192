@@ -78,6 +78,16 @@ class SourceRegressions(unittest.TestCase):
         self.assertIn("if (!TryRead8(0x12, &power))", body)
         self.assertIn("this->mark_failed()", body)
 
+    def test_m5stick_backlight_off_only_at_zero(self):
+        body = method_body("AXP192Component::UpdateBrightness()")
+        self.assertIn("brightness_ == 0.0f || curr_brightness_ == 0.0f", body)
+        self.assertIn("!SetLDO2(brightness_ > 0.0f)", body)
+        self.assertIn("curr_brightness_ = brightness_", body)
+        ldo2 = method_body("AXP192Component::SetLDO2(")
+        self.assertIn("if (!TryRead8(0x12, &power_control)) return false;", ldo2)
+        self.assertIn("detail::set_ldo2_enabled(power_control, enabled)", ldo2)
+        self.assertIn("desired == power_control || Write1Byte(0x12, desired)", ldo2)
+
 
 if __name__ == "__main__":
     unittest.main()

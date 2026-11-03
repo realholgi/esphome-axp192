@@ -252,6 +252,10 @@ void AXP192Component::UpdateBrightness()
         uint8_t buf = 0;
         if (!TryRead8(0x28, &buf)) return;
         if (!Write1Byte(0x28, (buf & 0x0f) | (ubri << 4))) return;
+        // Only a requested zero brightness disables LDO2. Restore it if
+        // brightness is raised again. Default brightness remains unchanged.
+        if ((brightness_ == 0.0f || curr_brightness_ == 0.0f) &&
+            !SetLDO2(brightness_ > 0.0f)) return;
         break;
       }
       case AXP192_M5CORE2:
@@ -586,19 +590,11 @@ void AXP192Component::SetCoulombClear()
     Write1Byte(0xB8,0x20);
 }
 
-void AXP192Component::SetLDO2( bool State )
-{
-    uint8_t buf = 0;
-    if (!TryRead8(0x12, &buf)) return;
-    if( State == true )
-    {
-        buf = (1<<2) | buf;
-    }
-    else
-    {
-        buf = ~(1<<2) & buf;
-    }
-    Write1Byte( 0x12 , buf );
+bool AXP192Component::SetLDO2(bool enabled) {
+  uint8_t power_control = 0;
+  if (!TryRead8(0x12, &power_control)) return false;
+  const uint8_t desired = detail::set_ldo2_enabled(power_control, enabled);
+  return desired == power_control || Write1Byte(0x12, desired);
 }
 
 void AXP192Component::SetLDO3(bool State)

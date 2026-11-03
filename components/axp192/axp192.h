@@ -112,7 +112,7 @@ protected:
     float GetBatCoulombOut();
     uint8_t GetWarningLevel(void);
     void SetCoulombClear();
-    void SetLDO2( bool State );
+    bool SetLDO2(bool enabled);
     void SetLDO3( bool State );
     void SetAdcState(bool State);
 
