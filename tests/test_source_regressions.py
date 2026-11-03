@@ -123,6 +123,13 @@ class SourceRegressions(unittest.TestCase):
         self.assertIn("i2c_error_count_++", CPP)
         self.assertIn("set_i2c_errors_sensor", HEADER)
 
+    def test_display_state_rolls_back_after_failed_i2c(self):
+        self.assertIn("const bool previous = this->display_enabled_", HEADER)
+        self.assertIn("this->display_enabled_ = previous;", HEADER)
+        self.assertIn("if (this->apply_brightness()) return true;", HEADER)
+        self.assertIn("this->curr_brightness_ = -1.0f;", HEADER)
+        self.assertIn("this->apply_brightness();", method_body("AXP192Component::update()"))
+
     def test_brightness_not_published_on_write_failure(self):
         control = method_body("AXP192BrightnessNumber::apply_value_(")
         self.assertIn("if (!this->parent_->apply_brightness())", control)
