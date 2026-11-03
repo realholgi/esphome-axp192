@@ -49,6 +49,8 @@ public:
     this->UpdateBrightness();
   }
   void set_model(AXP192Model model) { this->model_ = model; }
+  void set_battery_curve_lipo(bool enabled) { this->battery_curve_lipo_ = enabled; }
+  void set_battery_smoothing(float alpha) { this->battery_smoothing_ = alpha; }
 
   // ========== INTERNAL METHODS ==========
   // (In most use cases you won't need these)
@@ -72,6 +74,10 @@ protected:
     float brightness_{1.0f};
     float curr_brightness_{-1.0f};
     bool display_enabled_{true};
+    bool battery_curve_lipo_{false};
+    float battery_smoothing_{1.0f};
+    float last_battery_level_{0.0f};
+    bool has_last_battery_level_{false};
     AXP192Model model_;
 
     /** M5 Stick Values

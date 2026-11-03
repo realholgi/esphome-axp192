@@ -52,6 +52,27 @@ constexpr float battery_level(float volts) {
   return pct < 0.0f ? 0.0f : (pct > 100.0f ? 100.0f : pct);
 }
 
+// Approximate open-circuit LiPo voltage-to-state-of-charge curve.
+// This is an estimate, not a fuel gauge (load and charging affect voltage).
+constexpr float battery_level_lipo(float v) {
+  constexpr float voltages[] = {3.00f, 3.30f, 3.50f, 3.60f, 3.70f, 3.75f, 3.80f,
+                                 3.85f, 3.90f, 4.00f, 4.10f, 4.20f};
+  constexpr float percentages[] = {0, 5, 10, 20, 40, 55, 65, 75, 85, 94, 99, 100};
+  if (v <= voltages[0]) return 0.0f;
+  constexpr unsigned size = sizeof(voltages) / sizeof(voltages[0]);
+  for (unsigned i = 1; i < size; i++) {
+    if (v <= voltages[i]) {
+      const float fraction = (v - voltages[i-1]) / (voltages[i] - voltages[i-1]);
+      return percentages[i-1] + fraction * (percentages[i] - percentages[i-1]);
+    }
+  }
+  return 100.0f;
+}
+
+constexpr float smooth_battery_level(float previous, float measured, float alpha) {
+  return previous + alpha * (measured - previous);
+}
+
 // AXP192 coulomb counter, configured for 200 Hz ADC sampling (register 0x84).
 // Differences must be signed to represent net discharge without overflow.
 constexpr double coulomb_mAh(uint32_t charge, uint32_t discharge, double sample_hz = 200.0) {

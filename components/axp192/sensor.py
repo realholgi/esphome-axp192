@@ -11,6 +11,8 @@ CONF_BATTERY_CHARGE_CURRENT = "battery_charge_current"
 CONF_BATTERY_DISCHARGE_CURRENT = "battery_discharge_current"
 CONF_USB_VOLTAGE = "usb_voltage"
 CONF_USB_CURRENT = "usb_current"
+CONF_BATTERY_CURVE = "battery_curve"
+CONF_BATTERY_SMOOTHING = "battery_smoothing"
 
 DEPENDENCIES = ['i2c']
 AUTO_LOAD = ['binary_sensor', 'number', 'switch']
@@ -43,6 +45,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional(CONF_BATTERY_DISCHARGE_CURRENT): sensor.sensor_schema(unit_of_measurement="mA", accuracy_decimals=1, device_class="current", state_class="measurement"),
     cv.Optional(CONF_USB_VOLTAGE): sensor.sensor_schema(unit_of_measurement="V", accuracy_decimals=3, device_class="voltage", state_class="measurement"),
     cv.Optional(CONF_USB_CURRENT): sensor.sensor_schema(unit_of_measurement="mA", accuracy_decimals=1, device_class="current", state_class="measurement"),
+    cv.Optional(CONF_BATTERY_CURVE, default="linear"): cv.one_of("linear", "lipo", lower=True),
+    cv.Optional(CONF_BATTERY_SMOOTHING, default=1.0): cv.float_range(min=0.0, max=1.0),
 }).extend(cv.polling_component_schema('60s')).extend(i2c.i2c_device_schema(0x34))
 
 
@@ -52,6 +56,8 @@ def to_code(config):
     yield i2c.register_i2c_device(var, config)
 
     cg.add(var.set_model(config[CONF_MODEL]))
+    cg.add(var.set_battery_curve_lipo(config[CONF_BATTERY_CURVE] == "lipo"))
+    cg.add(var.set_battery_smoothing(config[CONF_BATTERY_SMOOTHING]))
     if CONF_BATTERY_LEVEL in config:
         conf = config[CONF_BATTERY_LEVEL]
         sens = yield sensor.new_sensor(conf)
