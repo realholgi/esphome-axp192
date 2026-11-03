@@ -32,7 +32,7 @@ CONFIG_SCHEMA = cv.Schema({
         ),
     cv.Optional(CONF_CHARGING): binary_sensor.binary_sensor_schema(),
     cv.Optional(CONF_BRIGHTNESS, default=1.0): cv.percentage,
-}).extend(cv.polling_component_schema('60s')).extend(i2c.i2c_device_schema(0x77))
+}).extend(cv.polling_component_schema('60s')).extend(i2c.i2c_device_schema(0x34))
 
 
 def to_code(config):
