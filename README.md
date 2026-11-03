@@ -26,8 +26,9 @@ For the M5StickC Plus, see [the minimal ESP-IDF example](sample-config/m5stickcp
 It uses the `m5stick-c` board definition, native ESP-IDF, and I2C pins GPIO21/GPIO22.
 
 The AXP192 device's default I2C address is `0x34`. You may omit
-`address: 0x34` from the component's YAML. The legacy examples under
-`sample-config/` are historical and may use outdated ESPHome syntax.
+`address: 0x34` from the component's YAML. The sample configurations under `sample-config/` use the ESPHome 2026
+ESP-IDF syntax. The Core2 and Tough examples are configuration templates;
+their display peripherals must be configured separately.
 
 The `charging` entity reports the AXP192 charge-in-progress flag, *not* merely
 whether USB power is connected. The `battery_level` sensor is a rough
@@ -168,63 +169,21 @@ external_components:
     components: [axp192]
 ```
 
-### M5Stick-C
+### Device examples
 
-```yaml
-sensor:
-  - platform: axp192
-    model: M5STICKC
-    address: 0x34
-    i2c_id: bus_a
-    update_interval: 30s
-    battery_level:
-      name: "M5Stick Battery Level"
-      id: "m5stick_batterylevel"
-    charging:
-      name: "M5Stick Charging"
-```
+The samples deliberately keep the power-management component separate from
+device-specific TFT, touch and audio drivers. They need only Wi-Fi secrets and
+an appropriate ESP32 board.
 
-### M5Stack Core2
+- [M5StickC / Plus](sample-config/m5stickc.yaml): Power sensors, persistent
+  brightness control, optional backlight timer and button A
+- [M5StickC Plus (minimal)](sample-config/m5stickcplus-esp-idf.yaml):
+  Extended battery and USB diagnostics
+- [M5Stack Core2](sample-config/m5core2.yaml): Core2 power rails and
+  battery sensors
+- [M5Stack Tough](sample-config/m5tough.yaml): Tough power rails and
+  battery sensors
 
-```yaml
-sensor:
-  - platform: axp192
-    model: M5CORE2
-    address: 0x34
-    i2c_id: bus_a
-    update_interval: 30s
-    battery_level:
-      name: "${upper_devicename} Battery Level"
-      id: "${devicename}_batterylevel"
-    charging:
-      name: "${upper_devicename} Charging"
-```
-
-### M5Tough
-
-```yaml
-sensor:
-  - platform: axp192
-    model: M5Tough
-    address: 0x34
-    i2c_id: bus_a
-    update_interval: 30s
-    battery_level:
-      name: "${upper_devicename} Battery Level"
-      id: "${devicename}_batterylevel"
-    charging:
-      name: "${upper_devicename} Charging"
-```
-
-The display component required for the M5Tough is as follows:
-
-```yaml
-display:
-  - platform: ili9341
-    # 320x240
-    model: M5STACK
-    cs_pin: GPIO5
-    dc_pin: GPIO15
-    lambda: |-
-      it.print(160, 0, id(title_font), id(color_white), TextAlign::TOP_CENTER, "Hello World");
-```
+**Hardware note:** Only M5StickC/Plus has LDO2-based backlight power-off.
+Core2/Tough brightness registers differ; no touchscreen or display support
+is provided by this power-management component.
