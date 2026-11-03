@@ -71,9 +71,9 @@ class SourceRegressions(unittest.TestCase):
 
     def test_brightness_preserves_register_on_failed_read(self):
         body = method_body("AXP192Component::UpdateBrightness()")
-        self.assertIn("if (!TryRead8(0x28, &buf)) return;", body)
-        self.assertIn("if (!TryRead8(0x27, &buf)) return;", body)
-        self.assertIn("curr_brightness_ = brightness_", body)
+        self.assertIn("if (!TryRead8(0x28, &buf)) return false;", body)
+        self.assertIn("if (!TryRead8(0x27, &buf)) return false;", body)
+        self.assertIn("curr_brightness_ = requested", body)
 
     def test_power_register_read_is_guarded(self):
         body = method_body("AXP192Component::begin(")
@@ -82,9 +82,9 @@ class SourceRegressions(unittest.TestCase):
 
     def test_m5stick_backlight_off_only_at_zero(self):
         body = method_body("AXP192Component::UpdateBrightness()")
-        self.assertIn("brightness_ == 0.0f || curr_brightness_ == 0.0f", body)
-        self.assertIn("!SetLDO2(brightness_ > 0.0f)", body)
-        self.assertIn("curr_brightness_ = brightness_", body)
+        self.assertIn("requested == 0.0f || curr_brightness_ == 0.0f", body)
+        self.assertIn("!SetLDO2(requested > 0.0f)", body)
+        self.assertIn("curr_brightness_ = requested", body)
         ldo2 = method_body("AXP192Component::SetLDO2(")
         self.assertIn("if (!TryRead8(0x12, &power_control)) return false;", ldo2)
         self.assertIn("detail::set_ldo2_enabled(power_control, enabled)", ldo2)
