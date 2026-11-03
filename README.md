@@ -36,6 +36,16 @@ an I2C read failure, the last value is retained until a successful read.
 
 ### Verify a change
 
+Run the lightweight source regression tests without installing ESPHome:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+These checks guard against known regressions but are not compilation,
+integration, or hardware tests.
+
+
 Run `esphome config sample-config/m5stickcplus-esp-idf.yaml` and
 `esphome compile sample-config/m5stickcplus-esp-idf.yaml` with ESPHome
 2026.10 or newer. Provide `wifi_ssid` and `wifi_password` via a
