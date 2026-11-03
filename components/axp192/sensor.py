@@ -13,7 +13,7 @@ CONF_USB_VOLTAGE = "usb_voltage"
 CONF_USB_CURRENT = "usb_current"
 
 DEPENDENCIES = ['i2c']
-AUTO_LOAD = ['binary_sensor', 'number']
+AUTO_LOAD = ['binary_sensor', 'number', 'switch']
 
 axp192_ns = cg.esphome_ns.namespace('axp192')
 AXP192Component = axp192_ns.class_('AXP192Component', cg.PollingComponent, i2c.I2CDevice)

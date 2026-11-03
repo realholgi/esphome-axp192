@@ -111,6 +111,13 @@ class SourceRegressions(unittest.TestCase):
     def test_static_brightness_removed_from_sensor_schema(self):
         self.assertNotIn("CONF_BRIGHTNESS", PY)
 
+    def test_display_switch_keeps_number_setpoint(self):
+        self.assertIn("AXP192DisplaySwitch::write_state(bool state)", CPP)
+        self.assertIn("this->display_enabled_ ? brightness_ : 0.0f", CPP)
+        self.assertIn("this->pref_.save(&state)", CPP)
+        self.assertIn("this->parent_->set_display_enabled(state)", CPP)
+        self.assertIn("this->parent_->set_brightness(value / 100.0f)", CPP)
+
 
 if __name__ == "__main__":
     unittest.main()

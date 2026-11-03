@@ -6,6 +6,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/components/number/number.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/core/preferences.h"
 
 namespace esphome {
@@ -43,6 +44,10 @@ public:
   void set_usb_current_sensor(sensor::Sensor *value) { usb_current_sensor_ = value; }
   void set_brightness(float brightness) { brightness_ = brightness; }
   void apply_brightness() { this->UpdateBrightness(); }
+  void set_display_enabled(bool enabled) {
+    this->display_enabled_ = enabled;
+    this->UpdateBrightness();
+  }
   void set_model(AXP192Model model) { this->model_ = model; }
 
   // ========== INTERNAL METHODS ==========
@@ -66,6 +71,7 @@ protected:
     sensor::Sensor *usb_current_sensor_{nullptr};
     float brightness_{1.0f};
     float curr_brightness_{-1.0f};
+    bool display_enabled_{true};
     AXP192Model model_;
 
     /** M5 Stick Values
@@ -143,6 +149,25 @@ protected:
     uint32_t Read24bit( uint8_t Addr );
     uint32_t Read32bit( uint8_t Addr );
     bool ReadBuff(uint8_t addr, uint8_t size, uint8_t *buffer);
+};
+
+class AXP192DisplaySwitch : public switch_::Switch, public Component {
+ public:
+  void set_parent(AXP192Component *parent) { this->parent_ = parent; }
+  void set_restore_value(bool restore) { this->restore_value_ = restore; }
+  void set_initial_value(bool initial) { this->initial_value_ = initial; }
+
+  float get_setup_priority() const override { return setup_priority::LATE; }
+  void setup() override;
+  void dump_config() override;
+
+ protected:
+  void write_state(bool state) override;
+
+  AXP192Component *parent_{nullptr};
+  ESPPreferenceObject pref_;
+  bool initial_value_{true};
+  bool restore_value_{true};
 };
 
 class AXP192BrightnessNumber : public number::Number, public Component {
