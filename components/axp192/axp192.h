@@ -106,7 +106,7 @@ protected:
     bool TryRead8(uint8_t addr, uint8_t *data);
 };
 
-class AXP192DisplaySwitch};
+
 
 class AXP192DisplaySwitch : public switch_::Switch, public Component {
  public:
