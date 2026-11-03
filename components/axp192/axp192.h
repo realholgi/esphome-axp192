@@ -44,11 +44,22 @@ public:
   void set_usb_voltage_sensor(sensor::Sensor *value) { usb_voltage_sensor_ = value; }
   void set_usb_current_sensor(sensor::Sensor *value) { usb_current_sensor_ = value; }
   void set_brightness(float brightness) { brightness_ = brightness; }
-  bool apply_brightness() { return this->UpdateBrightness(); }
+  bool apply_brightness() {
+    if (this->UpdateBrightness()) return true;
+    // A prior I2C write may have succeeded before a later one failed.
+    // Force a complete re-application rather than trusting the cache.
+    this->curr_brightness_ = -1.0f;
+    return false;
+  }
   float get_brightness() const { return brightness_; }
   bool set_display_enabled(bool enabled) {
+    const bool previous = this->display_enabled_;
     this->display_enabled_ = enabled;
-    return this->UpdateBrightness();
+    if (this->apply_brightness()) return true;
+    // Keep internal state consistent with the previously published HA value.
+    // The invalidated brightness cache forces a repair on the next update.
+    this->display_enabled_ = previous;
+    return false;
   }
   void set_model(AXP192Model model) { this->model_ = model; }
   void set_battery_curve_lipo(bool enabled) { this->battery_curve_lipo_ = enabled; }
@@ -97,7 +108,7 @@ protected:
      * LD03: Vibration Motor
      */
 
-    void  begin(bool disableLDO2 = false, bool disableLDO3 = false, bool disableRTC = false, bool disableDCDC1 = false, bool disableDCDC3 = false);
+    bool begin(bool disableLDO2 = false, bool disableLDO3 = false, bool disableRTC = false, bool disableDCDC1 = false, bool disableDCDC3 = false);
     bool UpdateBrightness();
     bool  GetBatState();
     bool  GetChargingState();

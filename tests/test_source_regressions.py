@@ -78,7 +78,8 @@ class SourceRegressions(unittest.TestCase):
     def test_power_register_read_is_guarded(self):
         body = method_body("AXP192Component::begin(")
         self.assertIn("if (!TryRead8(0x12, &power))", body)
-        self.assertIn("this->mark_failed()", body)
+        self.assertIn("if (!TryRead8(0x12, &power)) return false;", body)
+        self.assertIn("if (!Write1Byte(0x12, buf)) return false;", body)
 
     def test_m5stick_backlight_off_only_at_zero(self):
         body = method_body("AXP192Component::UpdateBrightness()")
@@ -123,12 +124,32 @@ class SourceRegressions(unittest.TestCase):
         self.assertIn("i2c_error_count_++", CPP)
         self.assertIn("set_i2c_errors_sensor", HEADER)
 
+    def test_display_state_rolls_back_after_failed_i2c(self):
+        self.assertIn("const bool previous = this->display_enabled_", HEADER)
+        self.assertIn("this->display_enabled_ = previous;", HEADER)
+        self.assertIn("if (this->apply_brightness()) return true;", HEADER)
+        self.assertIn("this->curr_brightness_ = -1.0f;", HEADER)
+        self.assertIn("this->apply_brightness();", method_body("AXP192Component::update()"))
+
     def test_brightness_not_published_on_write_failure(self):
         control = method_body("AXP192BrightnessNumber::apply_value_(")
         self.assertIn("if (!this->parent_->apply_brightness())", control)
         self.assertIn("this->parent_->set_brightness(previous)", control)
         switch = method_body("AXP192DisplaySwitch::write_state(")
         self.assertIn("if (!this->parent_->set_display_enabled(state))", switch)
+
+    def test_axp192_setup_aborts_after_i2c_failure(self):
+        setup = method_body("AXP192Component::setup()")
+        begin = method_body("AXP192Component::begin(")
+        self.assertIn("if (!ok)", setup)
+        self.assertIn("this->mark_failed();", setup)
+        self.assertIn("if (ok && GetStartupReason()", setup)
+        self.assertIn("bool AXP192Component::begin(", CPP)
+        for register in ("0x27", "0x28", "0x84", "0x82", "0x33",
+                         "0x12", "0x36", "0x91", "0x90", "0x30",
+                         "0x39", "0x35", "0x32"):
+            if f"Write1Byte({register}," in begin:
+                self.assertRegex(begin, rf"if \(!Write1Byte\({register},")
 
 
 if __name__ == "__main__":
