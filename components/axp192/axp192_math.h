@@ -14,19 +14,6 @@ constexpr uint16_t decode13(uint8_t high, uint8_t low) {
   return (static_cast<uint16_t>(high) << 5) | (low & 0x1F);
 }
 
-constexpr uint16_t decode16(uint8_t high, uint8_t low) {
-  return (static_cast<uint16_t>(high) << 8) | low;
-}
-
-constexpr uint32_t decode24(uint8_t a, uint8_t b, uint8_t c) {
-  return (static_cast<uint32_t>(a) << 16) | (static_cast<uint32_t>(b) << 8) | c;
-}
-
-constexpr uint32_t decode32(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
-  return (static_cast<uint32_t>(a) << 24) | (static_cast<uint32_t>(b) << 16) |
-         (static_cast<uint32_t>(c) << 8) | d;
-}
-
 // LDO2 supplies the M5StickC/M5StickC Plus display backlight; preserve
 // all unrelated power-output enable bits in register 0x12.
 constexpr uint8_t set_ldo2_enabled(uint8_t power_control, bool enabled) {
@@ -71,14 +58,6 @@ constexpr float battery_level_lipo(float v) {
 
 constexpr float smooth_battery_level(float previous, float measured, float alpha) {
   return previous + alpha * (measured - previous);
-}
-
-// AXP192 coulomb counter, configured for 200 Hz ADC sampling (register 0x84).
-// Differences must be signed to represent net discharge without overflow.
-constexpr double coulomb_mAh(uint32_t charge, uint32_t discharge, double sample_hz = 200.0) {
-  return 65536.0 * 0.5 *
-         (static_cast<double>(charge) - static_cast<double>(discharge)) /
-         (3600.0 * sample_hz);
 }
 
 }  // namespace detail

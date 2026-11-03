@@ -18,20 +18,6 @@ enum AXP192Model {
   AXP192_M5TOUGH,
 };
 
-#define SLEEP_MSEC(us) (((uint64_t)us) * 1000L)
-#define SLEEP_SEC(us)  (((uint64_t)us) * 1000000L)
-#define SLEEP_MIN(us)  (((uint64_t)us) * 60L * 1000000L)
-#define SLEEP_HR(us)   (((uint64_t)us) * 60L * 60L * 1000000L)
-
-#define CURRENT_100MA  (0b0000)
-#define CURRENT_190MA  (0b0001)
-#define CURRENT_280MA  (0b0010)
-#define CURRENT_360MA  (0b0011)
-#define CURRENT_450MA  (0b0100)
-#define CURRENT_550MA  (0b0101)
-#define CURRENT_630MA  (0b0110)
-#define CURRENT_700MA  (0b0111)
-
 class AXP192DisplaySwitch;
 
 class AXP192Component : public PollingComponent, public i2c::I2CDevice {
@@ -115,68 +101,12 @@ protected:
 
     bool begin(bool disableLDO2 = false, bool disableLDO3 = false, bool disableRTC = false, bool disableDCDC1 = false, bool disableDCDC3 = false);
     bool UpdateBrightness();
-    bool  GetBatState();
-    bool  GetChargingState();
-    uint8_t  GetBatData();
-
-    void  EnableCoulombcounter(void);
-    void  DisableCoulombcounter(void);
-    void  StopCoulombcounter(void);
-    void  ClearCoulombcounter(void);
-    uint32_t GetCoulombchargeData(void);
-    uint32_t GetCoulombdischargeData(void);
-    float GetCoulombData(void);
-
-    uint16_t GetVbatData(void) __attribute__((deprecated));
-    uint16_t GetIchargeData(void) __attribute__((deprecated));
-    uint16_t GetIdischargeData(void) __attribute__((deprecated));
-    uint16_t GetTempData(void) __attribute__((deprecated));
-    uint32_t GetPowerbatData(void) __attribute__((deprecated));
-    uint16_t GetVinData(void) __attribute__((deprecated));
-    uint16_t GetIinData(void) __attribute__((deprecated));
-    uint16_t GetVusbinData(void) __attribute__((deprecated));
-    uint16_t GetIusbinData(void) __attribute__((deprecated));
-    uint16_t GetVapsData(void) __attribute__((deprecated));
-    uint8_t GetBtnPress(void);
-
-      // -- sleep
-    void SetSleep(void);
-    void DeepSleep(uint64_t time_in_us = 0);
-    void LightSleep(uint64_t time_in_us = 0);
-
-    // void SetChargeVoltage( uint8_t );
-    void  SetChargeCurrent( uint8_t );
-    float GetBatVoltage();
-    float GetBatCurrent();
-    float GetVinVoltage();
-    float GetVinCurrent();
-    float GetVBusVoltage();
-    float GetVBusCurrent();
-    float GetTempInAXP192();
-    float GetBatPower();
-    float GetBatChargeCurrent();
-    float GetAPSVoltage();
-    float GetBatCoulombInput();
-    float GetBatCoulombOut();
-    uint8_t GetWarningLevel(void);
-    void SetCoulombClear();
     bool SetLDO2(bool enabled);
-    void SetLDO3( bool State );
-    void SetAdcState(bool State);
-
-    void PowerOff();
-
-
     bool Write1Byte(uint8_t addr, uint8_t data);
     bool TryRead8(uint8_t addr, uint8_t *data);
-    uint8_t Read8bit(uint8_t addr);
-    uint16_t Read12Bit( uint8_t Addr);
-    uint16_t Read13Bit( uint8_t Addr);
-    uint16_t Read16bit( uint8_t Addr );
-    uint32_t Read24bit( uint8_t Addr );
-    uint32_t Read32bit( uint8_t Addr );
-    bool ReadBuff(uint8_t addr, uint8_t size, uint8_t *buffer);
 };
+
+class AXP192DisplaySwitch};
 
 class AXP192DisplaySwitch : public switch_::Switch, public Component {
  public:
