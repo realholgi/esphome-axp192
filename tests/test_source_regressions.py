@@ -149,7 +149,7 @@ class SourceRegressions(unittest.TestCase):
                          "0x12", "0x36", "0x91", "0x90", "0x30",
                          "0x39", "0x35", "0x32"):
             if f"Write1Byte({register}," in begin:
-                self.assertRegex(begin, rf"if \\(!Write1Byte\\({register},")
+                self.assertRegex(begin, rf"if \(!Write1Byte\({register},")
 
 
 if __name__ == "__main__":
