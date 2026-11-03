@@ -36,7 +36,7 @@ class SourceRegressions(unittest.TestCase):
         self.assertIn("i2c.i2c_device_schema(0x34)", PY)
 
     def test_binary_sensor_autoloaded(self):
-        self.assertIn("AUTO_LOAD = ['binary_sensor', 'number']", PY)
+        self.assertIn("AUTO_LOAD = ['binary_sensor', 'number', 'switch']", PY)
 
     def test_status_flags_are_masked(self):
         self.assertIn("Read8bit(0x01) & 0x20", method_body("AXP192Component::GetBatState()"))
