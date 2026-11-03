@@ -133,7 +133,7 @@ class SourceRegressions(unittest.TestCase):
         begin = method_body("AXP192Component::begin(")
         self.assertIn("if (!ok)", setup)
         self.assertIn("this->mark_failed();", setup)
-        self.assertIn("if (ok && GetStartupReason()", setup)
+        self.assertIn("if (ok && ::esp_reset_reason() == ESP_RST_POWERON)", setup)
         self.assertIn("bool AXP192Component::begin(", CPP)
         for register in ("0x27", "0x28", "0x84", "0x82", "0x33",
                          "0x12", "0x36", "0x91", "0x90", "0x30",
@@ -163,6 +163,16 @@ class SourceRegressions(unittest.TestCase):
                      "DeepSleep", "LightSleep", "PowerOff", "SetLDO3"):
             self.assertNotIn(name + "(", HEADER)
             self.assertNotIn("AXP192Component::" + name + "(", CPP)
+
+    def test_shared_core2_tough_register_paths(self):
+        setup = method_body("AXP192Component::begin(")
+        brightness = method_body("AXP192Component::UpdateBrightness()")
+        for body in (setup, brightness):
+            self.assertIn("case AXP192_M5CORE2:", body)
+            self.assertIn("case AXP192_M5TOUGH:", body)
+        self.assertEqual(setup.count("Write1Byte(0x27, 0xcc)"), 1)
+        self.assertEqual(brightness.count("TryRead8(0x27, &buf)"), 1)
+        self.assertNotIn("GetStartupReason(", CPP)
 
 
 if __name__ == "__main__":
