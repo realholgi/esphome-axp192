@@ -42,10 +42,26 @@ sensor:
     address: 0x34
     i2c_id: bus_a
     update_interval: 30s
+    # battery_curve: lipo  # optional; default: linear
+    # battery_smoothing: 0.3  # optional; default 1.0 (no smoothing)
     battery_level:
       name: "M5Stick Battery Level"
     charging:
       name: "M5Stick Charging"
+    battery_voltage:
+      name: "Battery Voltage"
+    battery_charge_current:
+      name: "Battery Charge Current"
+    battery_discharge_current:
+      name: "Battery Discharge Current"
+    usb_connected:
+      name: "USB Connected"
+    usb_voltage:
+      name: "USB Voltage"
+    usb_current:
+      name: "USB Current"
+    i2c_errors:
+      name: "AXP192 I2C Errors"
 
 number:
   - platform: axp192
@@ -54,3 +70,10 @@ number:
     mode: slider
     restore_value: true
     initial_value: 100
+
+switch:
+  - platform: axp192
+    axp192_id: axp_power
+    name: "Display Enabled"
+    restore_value: true
+    initial_value: true
