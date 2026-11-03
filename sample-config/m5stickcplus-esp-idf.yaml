@@ -73,7 +73,19 @@ number:
 
 switch:
   - platform: axp192
+    id: display_enabled
     axp192_id: axp_power
     name: "Display Enabled"
     restore_value: true
     initial_value: true
+    auto_off: 5min  # Optional; omit to disable the timer
+
+# Optional: wake display with button A (GPIO37)
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO37
+      inverted: true
+    name: "Wake Display"
+    on_press:
+      - switch.turn_on: display_enabled
