@@ -8,34 +8,28 @@ namespace esphome {
 namespace axp192 {
 
 static const char *TAG = "axp192.sensor";
-void AXP192Component::setup()
-{
+void AXP192Component::setup() {
+  if (this->i2c_errors_sensor_ != nullptr) this->i2c_errors_sensor_->publish_state(0);
+  bool ok = false;
   switch (this->model_) {
     case AXP192_M5STICKC:
-    {
-        begin(false, false, false, false, false);
-        break;
-    }
+      ok = this->begin(false, false, false, false, false);
+      break;
     case AXP192_M5CORE2:
-    {
-        // disable LDO3 Vibration
-        begin(false, true, false, false, false);
-        break;
-    }
+      // LDO3 powers the vibrator on this device.
+      ok = this->begin(false, true, false, false, false);
+      break;
     case AXP192_M5TOUGH:
-    {
-        begin(false, false, false, false, false);
-
-        // If we're waking from a cold boot
-        if (GetStartupReason() == "ESP_RST_POWERON")
-        {
-            ESP_LOGD(TAG, "First power on, restarting ESP...");
-
-            // Reboot the ESP with the axp initialised
-            esp_restart();
-        }
-        break;
-    }
+      ok = this->begin(false, false, false, false, false);
+      if (ok && GetStartupReason() == "ESP_RST_POWERON") {
+        ESP_LOGD(TAG, "First power on, restarting ESP...");
+        esp_restart();
+      }
+      break;
+  }
+  if (!ok) {
+    ESP_LOGE(TAG, "AXP192 initialization failed; stopping component");
+    this->mark_failed();
   }
 }
 
@@ -43,6 +37,7 @@ void AXP192Component::dump_config() {
   ESP_LOGCONFIG(TAG, "AXP192:");
   LOG_I2C_DEVICE(this);
   LOG_SENSOR("  ", "Battery Level", this->batterylevel_sensor_);
+  LOG_SENSOR("  ", "I2C Errors", this->i2c_errors_sensor_);
 }
 
 float AXP192Component::get_setup_priority() const { return setup_priority::DATA; }
@@ -66,6 +61,7 @@ void AXP192Component::update() {
         if (this->battery_voltage_sensor_ != nullptr) this->battery_voltage_sensor_->publish_state(vbat);
       } else {
         ESP_LOGW(TAG, "Battery voltage read failed; keeping previous sensor state");
+        this->record_i2c_error_();
       }
     }
 
@@ -78,6 +74,7 @@ void AXP192Component::update() {
         this->charging_sensor_->publish_state(charging);
       } else {
         ESP_LOGW(TAG, "Charging status read failed; keeping previous sensor state");
+        this->record_i2c_error_();
       }
     }
 
@@ -89,7 +86,7 @@ void AXP192Component::update() {
       uint8_t bytes[2] = {};
       if (!this->read_bytes(reg, bytes, sizeof(bytes))) {
         ESP_LOGW(TAG, "ADC read failed at 0x%02X; keeping last value", reg);
-        this->status_set_warning();
+        this->record_i2c_error_();
         return;
       }
       const uint16_t raw = is_13_bit ? detail::decode13(bytes[0], bytes[1])
@@ -110,88 +107,93 @@ void AXP192Component::update() {
       }
     }
 
-    UpdateBrightness();
+    this->apply_brightness();
 }
 
-void AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC, bool disableDCDC1, bool disableDCDC3)
+bool AXP192Component::begin(bool disableLDO2, bool disableLDO3, bool disableRTC, bool disableDCDC1, bool disableDCDC3)
 {
   switch (this->model_) {
     case AXP192_M5STICKC:
     {
         // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
-        Write1Byte(0x28, 0xcc);
+        if (!Write1Byte(0x28, 0xcc)) return false;
         break;
     }
     case AXP192_M5CORE2:
     {
         // Set DCDC3 (TFT_LED & TFT) 3.0V
-        Write1Byte(0x27, 0xcc);
+        if (!Write1Byte(0x27, 0xcc)) return false;
         // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
-        Write1Byte(0x28, 0xcc);
+        if (!Write1Byte(0x28, 0xcc)) return false;
         break;
     }
     case AXP192_M5TOUGH:
     {
         // Set DCDC3 (TFT_LED & TFT) 3.0V
-        Write1Byte(0x27, 0xcc);
+        if (!Write1Byte(0x27, 0xcc)) return false;
         // Set LDO2 & LDO3(TFT_LED & TFT) 3.0V
-        Write1Byte(0x28, 0xcc);
+        if (!Write1Byte(0x28, 0xcc)) return false;
         break;
     }
   }
 
     // Set ADC sample rate to 200hz
-    Write1Byte(0x84, 0b11110010);
+    if (!Write1Byte(0x84, 0b11110010)) return false;
 
     // Set ADC to All Enable
-    Write1Byte(0x82, 0xff);
+    if (!Write1Byte(0x82, 0xff)) return false;
 
     // Bat charge voltage to 4.2, Current 100MA
-    Write1Byte(0x33, 0xc0);
+    if (!Write1Byte(0x33, 0xc0)) return false;
 
     // Depending on configuration enable LDO2, LDO3, DCDC1, DCDC3.
     uint8_t power = 0;
-    if (!TryRead8(0x12, &power)) {
-      this->mark_failed();
-      return;
-    }
+    if (!TryRead8(0x12, &power)) return false;
     uint8_t buf = (power & 0xef) | 0x4D;
     if(disableLDO3) buf &= ~(1<<3);
     if(disableLDO2) buf &= ~(1<<2);
     if(disableDCDC3) buf &= ~(1<<1);
     if(disableDCDC1) buf &= ~(1<<0);
-    Write1Byte(0x12, buf);
+    if (!Write1Byte(0x12, buf)) return false;
 
     // 128ms power on, 4s power off
-    Write1Byte(0x36, 0x0C);
+    if (!Write1Byte(0x36, 0x0C)) return false;
 
     if(!disableRTC)
     {
         // Set RTC voltage to 3.3V
-        Write1Byte(0x91, 0xF0);
+        if (!Write1Byte(0x91, 0xF0)) return false;
 
         // Set GPIO0 to LDO
-        Write1Byte(0x90, 0x02);
+        if (!Write1Byte(0x90, 0x02)) return false;
     }
 
     // Disable vbus hold limit
-    Write1Byte(0x30, 0x80);
+    if (!Write1Byte(0x30, 0x80)) return false;
 
     // Set temperature protection
-    Write1Byte(0x39, 0xfc);
+    if (!Write1Byte(0x39, 0xfc)) return false;
 
     // Enable RTC BAT charge
-    Write1Byte(0x35, 0xa2 & (disableRTC ? 0x7F : 0xFF));
+    if (!Write1Byte(0x35, 0xa2 & (disableRTC ? 0x7F : 0xFF))) return false;
 
     // Enable bat detection
-    Write1Byte(0x32, 0x46);
+    if (!Write1Byte(0x32, 0x46)) return false;
 
+    return true;
+}
+
+void AXP192Component::record_i2c_error_() {
+  this->i2c_error_count_++;
+  this->status_set_warning();
+  if (this->i2c_errors_sensor_ != nullptr)
+    this->i2c_errors_sensor_->publish_state(this->i2c_error_count_);
 }
 
 bool AXP192Component::Write1Byte(uint8_t addr, uint8_t data) {
   if (!this->write_byte(addr, data)) {
     ESP_LOGW(TAG, "I2C write failed at register 0x%02X", addr);
-    this->status_set_warning();
+    this->record_i2c_error_();
     return false;
   }
   return true;
@@ -201,7 +203,7 @@ bool AXP192Component::TryRead8(uint8_t addr, uint8_t *data) {
   *data = 0;
   if (!this->read_byte(addr, data)) {
     ESP_LOGW(TAG, "I2C read failed at register 0x%02X", addr);
-    this->status_set_warning();
+    this->record_i2c_error_();
     return false;
   }
   return true;
@@ -258,18 +260,18 @@ uint32_t AXP192Component::Read32bit( uint8_t Addr )
 bool AXP192Component::ReadBuff(uint8_t addr, uint8_t size, uint8_t *buffer) {
   if (!this->read_bytes(addr, buffer, size)) {
     ESP_LOGW(TAG, "I2C block read failed at register 0x%02X", addr);
-    this->status_set_warning();
+    this->record_i2c_error_();
     return false;
   }
   return true;
 }
 
-void AXP192Component::UpdateBrightness()
+bool AXP192Component::UpdateBrightness()
 {
     const float requested = this->display_enabled_ ? brightness_ : 0.0f;
     if (requested == curr_brightness_)
     {
-        return;
+        return true;
     }
 
     ESP_LOGD(TAG, "Brightness=%f (Curr: %f)", brightness_, curr_brightness_);
@@ -287,30 +289,31 @@ void AXP192Component::UpdateBrightness()
       case AXP192_M5STICKC:
       {
         uint8_t buf = 0;
-        if (!TryRead8(0x28, &buf)) return;
-        if (!Write1Byte(0x28, (buf & 0x0f) | (ubri << 4))) return;
+        if (!TryRead8(0x28, &buf)) return false;
+        if (!Write1Byte(0x28, (buf & 0x0f) | (ubri << 4))) return false;
         // Only a requested zero brightness disables LDO2. Restore it if
         // brightness is raised again. Default brightness remains unchanged.
         if ((requested == 0.0f || curr_brightness_ == 0.0f) &&
-            !SetLDO2(requested > 0.0f)) return;
+            !SetLDO2(requested > 0.0f)) return false;
         break;
       }
       case AXP192_M5CORE2:
       {
         uint8_t buf = 0;
-        if (!TryRead8(0x27, &buf)) return;
-        if (!Write1Byte(0x27, (buf & 0x80) | (ubri << 3))) return;
+        if (!TryRead8(0x27, &buf)) return false;
+        if (!Write1Byte(0x27, (buf & 0x80) | (ubri << 3))) return false;
         break;
       }
       case AXP192_M5TOUGH:
       {
         uint8_t buf = 0;
-        if (!TryRead8(0x27, &buf)) return;
-        if (!Write1Byte(0x27, (buf & 0x80) | (ubri << 3))) return;
+        if (!TryRead8(0x27, &buf)) return false;
+        if (!Write1Byte(0x27, (buf & 0x80) | (ubri << 3))) return false;
         break;
       }
     }
     curr_brightness_ = requested;
+    return true;
 }
 
 bool AXP192Component::GetBatState()
@@ -728,7 +731,10 @@ void AXP192DisplaySwitch::dump_config() {
 }
 
 void AXP192DisplaySwitch::write_state(bool state) {
-  this->parent_->set_display_enabled(state);
+  if (!this->parent_->set_display_enabled(state)) {
+    ESP_LOGW(TAG, "Display power transition failed");
+    return;
+  }
   this->publish_state(state);
   if (this->restore_value_) this->pref_.save(&state);
 }
@@ -755,8 +761,13 @@ void AXP192BrightnessNumber::control(float value) {
 void AXP192BrightnessNumber::apply_value_(float value, bool persist) {
   // Restoration and MQTT commands use the same 0-100% range.
   value = detail::clamp_percent(value);
+  const float previous = this->parent_->get_brightness();
   this->parent_->set_brightness(value / 100.0f);
-  this->parent_->apply_brightness();
+  if (!this->parent_->apply_brightness()) {
+    this->parent_->set_brightness(previous);
+    ESP_LOGW(TAG, "Brightness write failed; keeping previous setpoint");
+    return;
+  }
   // This state is the requested setpoint, not a measurement of the backlight.
   this->publish_state(value);
   if (persist && this->restore_value_)
