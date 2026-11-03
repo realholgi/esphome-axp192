@@ -54,7 +54,13 @@ void AXP192Component::update() {
         const uint16_t adc = detail::decode12(raw[0], raw[1]);
         const float vbat = detail::battery_voltage(adc);
         // Voltage-only approximation; this is not a calibrated fuel gauge.
-        const float battery_level = detail::battery_level(vbat);
+        const float measured_level = this->battery_curve_lipo_ ? detail::battery_level_lipo(vbat)
+                                                                  : detail::battery_level(vbat);
+        const float battery_level = this->has_last_battery_level_
+            ? detail::smooth_battery_level(this->last_battery_level_, measured_level, this->battery_smoothing_)
+            : measured_level;
+        this->last_battery_level_ = battery_level;
+        this->has_last_battery_level_ = true;
         ESP_LOGD(TAG, "Got Battery Level=%f (%f)", battery_level, vbat);
         if (this->batterylevel_sensor_ != nullptr) this->batterylevel_sensor_->publish_state(battery_level);
         if (this->battery_voltage_sensor_ != nullptr) this->battery_voltage_sensor_->publish_state(vbat);
