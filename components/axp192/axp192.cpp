@@ -48,7 +48,7 @@ void AXP192Component::dump_config() {
 float AXP192Component::get_setup_priority() const { return setup_priority::DATA; }
 
 void AXP192Component::update() {
-    if (this->batterylevel_sensor_ != nullptr) {
+    if (this->batterylevel_sensor_ != nullptr || this->battery_voltage_sensor_ != nullptr) {
       uint8_t raw[2] = {};
       if (this->read_bytes(0x78, raw, sizeof(raw))) {
         const uint16_t adc = detail::decode12(raw[0], raw[1]);
@@ -56,7 +56,8 @@ void AXP192Component::update() {
         // Voltage-only approximation; this is not a calibrated fuel gauge.
         const float battery_level = detail::battery_level(vbat);
         ESP_LOGD(TAG, "Got Battery Level=%f (%f)", battery_level, vbat);
-        this->batterylevel_sensor_->publish_state(battery_level);
+        if (this->batterylevel_sensor_ != nullptr) this->batterylevel_sensor_->publish_state(battery_level);
+        if (this->battery_voltage_sensor_ != nullptr) this->battery_voltage_sensor_->publish_state(vbat);
       } else {
         ESP_LOGW(TAG, "Battery voltage read failed; keeping previous sensor state");
       }
@@ -73,6 +74,26 @@ void AXP192Component::update() {
         ESP_LOGW(TAG, "Charging status read failed; keeping previous sensor state");
       }
     }
+
+
+    // AXP192 battery current ADC channels are 13-bit with 0.5 mA/LSB;
+    // USB VBUS voltage and current ADC channels are 12-bit.
+    auto publish_adc = [this](sensor::Sensor *entity, uint8_t reg, bool is_13_bit, float scale) {
+      if (entity == nullptr) return;
+      uint8_t bytes[2] = {};
+      if (!this->read_bytes(reg, bytes, sizeof(bytes))) {
+        ESP_LOGW(TAG, "ADC read failed at 0x%02X; keeping last value", reg);
+        this->status_set_warning();
+        return;
+      }
+      const uint16_t raw = is_13_bit ? detail::decode13(bytes[0], bytes[1])
+                                     : detail::decode12(bytes[0], bytes[1]);
+      entity->publish_state(raw * scale);
+    };
+    publish_adc(this->battery_charge_current_sensor_, 0x7A, true, 0.5f);
+    publish_adc(this->battery_discharge_current_sensor_, 0x7C, true, 0.5f);
+    publish_adc(this->usb_voltage_sensor_, 0x5A, false, 0.0017f);
+    publish_adc(this->usb_current_sensor_, 0x5C, false, 0.375f);
 
     UpdateBrightness();
 }

@@ -35,6 +35,11 @@ class AXP192Component : public PollingComponent, public i2c::I2CDevice {
 public:
   void set_batterylevel_sensor(sensor::Sensor *batterylevel_sensor) { batterylevel_sensor_ = batterylevel_sensor; }
   void set_charging_sensor(binary_sensor::BinarySensor *charging_sensor) { charging_sensor_ = charging_sensor; }
+  void set_battery_voltage_sensor(sensor::Sensor *value) { battery_voltage_sensor_ = value; }
+  void set_battery_charge_current_sensor(sensor::Sensor *value) { battery_charge_current_sensor_ = value; }
+  void set_battery_discharge_current_sensor(sensor::Sensor *value) { battery_discharge_current_sensor_ = value; }
+  void set_usb_voltage_sensor(sensor::Sensor *value) { usb_voltage_sensor_ = value; }
+  void set_usb_current_sensor(sensor::Sensor *value) { usb_current_sensor_ = value; }
   void set_brightness(float brightness) { brightness_ = brightness; }
   void apply_brightness() { this->UpdateBrightness(); }
   void set_model(AXP192Model model) { this->model_ = model; }
@@ -52,6 +57,11 @@ private:
 protected:
     sensor::Sensor *batterylevel_sensor_;
     binary_sensor::BinarySensor *charging_sensor_;
+    sensor::Sensor *battery_voltage_sensor_{nullptr};
+    sensor::Sensor *battery_charge_current_sensor_{nullptr};
+    sensor::Sensor *battery_discharge_current_sensor_{nullptr};
+    sensor::Sensor *usb_voltage_sensor_{nullptr};
+    sensor::Sensor *usb_current_sensor_{nullptr};
     float brightness_{1.0f};
     float curr_brightness_{-1.0f};
     AXP192Model model_;
