@@ -5,6 +5,8 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/i2c/i2c.h"
+#include "esphome/components/number/number.h"
+#include "esphome/core/preferences.h"
 
 namespace esphome {
 namespace axp192 {
@@ -34,6 +36,7 @@ public:
   void set_batterylevel_sensor(sensor::Sensor *batterylevel_sensor) { batterylevel_sensor_ = batterylevel_sensor; }
   void set_charging_sensor(binary_sensor::BinarySensor *charging_sensor) { charging_sensor_ = charging_sensor; }
   void set_brightness(float brightness) { brightness_ = brightness; }
+  void apply_brightness() { this->UpdateBrightness(); }
   void set_model(AXP192Model model) { this->model_ = model; }
 
   // ========== INTERNAL METHODS ==========
@@ -112,7 +115,7 @@ protected:
     float GetBatCoulombOut();
     uint8_t GetWarningLevel(void);
     void SetCoulombClear();
-    void SetLDO2( bool State );
+    bool SetLDO2(bool enabled);
     void SetLDO3( bool State );
     void SetAdcState(bool State);
 
@@ -128,6 +131,26 @@ protected:
     uint32_t Read24bit( uint8_t Addr );
     uint32_t Read32bit( uint8_t Addr );
     bool ReadBuff(uint8_t addr, uint8_t size, uint8_t *buffer);
+};
+
+class AXP192BrightnessNumber : public number::Number, public Component {
+ public:
+  void set_parent(AXP192Component *parent) { this->parent_ = parent; }
+  void set_initial_value(float initial_value) { this->initial_value_ = initial_value; }
+  void set_restore_value(bool restore) { this->restore_value_ = restore; }
+
+  float get_setup_priority() const override { return setup_priority::LATE; }
+  void setup() override;
+  void dump_config() override;
+
+ protected:
+  void control(float value) override;
+  void apply_value_(float value, bool persist);
+
+  AXP192Component *parent_{nullptr};
+  ESPPreferenceObject pref_;
+  float initial_value_{100.0f};
+  bool restore_value_{true};
 };
 
 }
