@@ -69,6 +69,39 @@ Turning the backlight completely off is supported for `M5STICKC`
 only, not `M5CORE2` or `M5TOUGH`. I2C failures cause the
 component to retry applying the requested setting on a later update.
 
+### Additional diagnostics and power controls
+
+The AXP192 provides optional telemetry entities on the existing `sensor:
+- platform: axp192` entry:
+
+- `battery_voltage` (V)
+- `battery_charge_current` (mA)
+- `battery_discharge_current` (mA)
+- `usb_voltage` (V)
+- `usb_current` (mA)
+- `i2c_errors` (count since boot)
+
+The optional binary sensor `usb_connected` reports AXP192 VBUS presence,
+independently from `charging`. It can be used for a Home Assistant
+notification when USB power is lost, provided Wi-Fi and MQTT/API are
+still reachable.
+
+`battery_curve: linear` preserves the original voltage-based estimate.
+`battery_curve: lipo` selects an approximate piecewise LiPo curve,
+which is most meaningful when the battery is resting. Both modes are
+estimates rather than calibrated state-of-charge readings.
+`battery_smoothing` ranges from 0.0 to 1.0, with 1.0 disabling
+smoothing; for example, 0.3 retains 70% of the previous reading.
+
+The optional `switch: - platform: axp192` turns the M5StickC display
+backlight on and off while retaining the last configured `number`
+brightness setpoint. Its on/off state is stored locally and restored
+after reboot. A failed I2C command leaves the previous published switch
+or number state unchanged; the command can be retried.
+
+See [the complete ESP-IDF example](sample-config/m5stickcplus-esp-idf.yaml)
+for the YAML syntax.
+
 ### Verify a change
 
 Run the lightweight source regression tests without installing ESPHome:
@@ -77,8 +110,9 @@ Run the lightweight source regression tests without installing ESPHome:
 python3 -m unittest discover -s tests -v
 ```
 
-These checks guard against known regressions but are not compilation,
-integration, or hardware tests.
+These checks guard against known regressions. GitHub Actions also compiles
+an ESP-IDF firmware based on the local component source; this does not
+replace a real-device test.
 
 
 Run `esphome config sample-config/m5stickcplus-esp-idf.yaml` and
