@@ -95,6 +95,15 @@ void AXP192Component::update() {
     publish_adc(this->usb_voltage_sensor_, 0x5A, false, 0.0017f);
     publish_adc(this->usb_current_sensor_, 0x5C, false, 0.375f);
 
+    if (this->usb_connected_sensor_ != nullptr) {
+      uint8_t status = 0;
+      if (this->TryRead8(0x00, &status)) {
+        this->usb_connected_sensor_->publish_state(detail::usb_connected(status));
+      } else {
+        ESP_LOGW(TAG, "USB presence read failed; keeping last value");
+      }
+    }
+
     UpdateBrightness();
 }
 

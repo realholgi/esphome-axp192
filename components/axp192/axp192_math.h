@@ -40,6 +40,9 @@ constexpr float clamp_percent(float value) {
 }
 
 constexpr bool battery_present(uint8_t status) { return (status & 0x20) != 0; }
+// AXP192 power input status register 0x00: bit 5 = VBUS present.
+constexpr bool usb_connected(uint8_t status) { return (status & 0x20) != 0; }
+
 constexpr bool charging(uint8_t status) { return (status & 0x40) != 0; }
 
 constexpr float battery_voltage(uint16_t adc) { return adc * 0.0011f; }

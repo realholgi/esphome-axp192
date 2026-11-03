@@ -5,6 +5,7 @@ from esphome.const import CONF_ID,\
     CONF_BATTERY_LEVEL, UNIT_PERCENT, ICON_BATTERY, CONF_MODEL
 
 CONF_CHARGING = "charging"
+CONF_USB_CONNECTED = "usb_connected"
 CONF_BATTERY_VOLTAGE = "battery_voltage"
 CONF_BATTERY_CHARGE_CURRENT = "battery_charge_current"
 CONF_BATTERY_DISCHARGE_CURRENT = "battery_discharge_current"
@@ -36,6 +37,7 @@ CONFIG_SCHEMA = cv.Schema({
             icon=ICON_BATTERY,
         ),
     cv.Optional(CONF_CHARGING): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_USB_CONNECTED): binary_sensor.binary_sensor_schema(device_class="plug"),
     cv.Optional(CONF_BATTERY_VOLTAGE): sensor.sensor_schema(unit_of_measurement="V", accuracy_decimals=3, device_class="voltage", state_class="measurement"),
     cv.Optional(CONF_BATTERY_CHARGE_CURRENT): sensor.sensor_schema(unit_of_measurement="mA", accuracy_decimals=1, device_class="current", state_class="measurement"),
     cv.Optional(CONF_BATTERY_DISCHARGE_CURRENT): sensor.sensor_schema(unit_of_measurement="mA", accuracy_decimals=1, device_class="current", state_class="measurement"),
@@ -71,3 +73,7 @@ def to_code(config):
         if key in config:
             sens = yield sensor.new_sensor(config[key])
             cg.add(getattr(var, setter)(sens))
+
+    if CONF_USB_CONNECTED in config:
+        sens = yield binary_sensor.new_binary_sensor(config[CONF_USB_CONNECTED])
+        cg.add(var.set_usb_connected_sensor(sens))

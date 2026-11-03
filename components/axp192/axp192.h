@@ -35,6 +35,7 @@ class AXP192Component : public PollingComponent, public i2c::I2CDevice {
 public:
   void set_batterylevel_sensor(sensor::Sensor *batterylevel_sensor) { batterylevel_sensor_ = batterylevel_sensor; }
   void set_charging_sensor(binary_sensor::BinarySensor *charging_sensor) { charging_sensor_ = charging_sensor; }
+  void set_usb_connected_sensor(binary_sensor::BinarySensor *value) { usb_connected_sensor_ = value; }
   void set_battery_voltage_sensor(sensor::Sensor *value) { battery_voltage_sensor_ = value; }
   void set_battery_charge_current_sensor(sensor::Sensor *value) { battery_charge_current_sensor_ = value; }
   void set_battery_discharge_current_sensor(sensor::Sensor *value) { battery_discharge_current_sensor_ = value; }
@@ -57,6 +58,7 @@ private:
 protected:
     sensor::Sensor *batterylevel_sensor_;
     binary_sensor::BinarySensor *charging_sensor_;
+    binary_sensor::BinarySensor *usb_connected_sensor_{nullptr};
     sensor::Sensor *battery_voltage_sensor_{nullptr};
     sensor::Sensor *battery_charge_current_sensor_{nullptr};
     sensor::Sensor *battery_discharge_current_sensor_{nullptr};
