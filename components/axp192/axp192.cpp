@@ -1,4 +1,5 @@
 #include "axp192.h"
+#include "axp192_math.h"
 #include "esphome/core/log.h"
 #include "esp_sleep.h"
 #include "esp_system.h"
@@ -50,12 +51,10 @@ void AXP192Component::update() {
     if (this->batterylevel_sensor_ != nullptr) {
       uint8_t raw[2] = {};
       if (this->read_bytes(0x78, raw, sizeof(raw))) {
-        const uint16_t adc = (static_cast<uint16_t>(raw[0]) << 4) | (raw[1] & 0x0F);
-        const float vbat = adc * 0.0011f;
+        const uint16_t adc = detail::decode12(raw[0], raw[1]);
+        const float vbat = detail::battery_voltage(adc);
         // Voltage-only approximation; this is not a calibrated fuel gauge.
-        float battery_level = 100.0f * ((vbat - 3.0f) / (4.1f - 3.0f));
-        if (battery_level > 100.0f) battery_level = 100.0f;
-        if (battery_level < 0.0f) battery_level = 0.0f;
+        const float battery_level = detail::battery_level(vbat);
         ESP_LOGD(TAG, "Got Battery Level=%f (%f)", battery_level, vbat);
         this->batterylevel_sensor_->publish_state(battery_level);
       } else {
@@ -66,8 +65,8 @@ void AXP192Component::update() {
     if (this->charging_sensor_ != nullptr) {
       uint8_t status = 0;
       if (this->read_byte(0x01, &status)) {
-        const bool charging = (status & 0x40) != 0;
-        const bool battery_present = (status & 0x20) != 0;
+        const bool charging = detail::charging(status);
+        const bool battery_present = detail::battery_present(status);
         ESP_LOGD(TAG, "Got Charging=%d state=%d", charging, battery_present);
         this->charging_sensor_->publish_state(charging);
       } else {
@@ -169,7 +168,7 @@ uint16_t AXP192Component::Read12Bit( uint8_t Addr)
     uint16_t Data = 0;
     uint8_t buf[2] = {};
     ReadBuff(Addr,2,buf);
-    Data = (static_cast<uint16_t>(buf[0]) << 4) | (buf[1] & 0x0F); //
+    Data = detail::decode12(buf[0], buf[1]);
     return Data;
 }
 
@@ -178,7 +177,7 @@ uint16_t AXP192Component::Read13Bit( uint8_t Addr)
     uint16_t Data = 0;
     uint8_t buf[2] = {};
     ReadBuff(Addr,2,buf);
-    Data = (static_cast<uint16_t>(buf[0]) << 5) | (buf[1] & 0x1F); //
+    Data = detail::decode13(buf[0], buf[1]);
     return Data;
 }
 
@@ -189,12 +188,7 @@ uint16_t AXP192Component::Read16bit( uint8_t Addr )
     if (!this->read_bytes(Addr, Buff, sizeof(Buff))) {
       ESP_LOGW(TAG, "I2C block read failed at register 0x%02X", Addr);
     }
-    for( int i = 0 ; i < sizeof(Buff) ; i++ )
-    {
-        ReData <<= 8;
-        ReData |= Buff[i];
-    }
-    return ReData;
+    return detail::decode16(Buff[0], Buff[1]);
 }
 
 uint32_t AXP192Component::Read24bit( uint8_t Addr )
@@ -202,12 +196,7 @@ uint32_t AXP192Component::Read24bit( uint8_t Addr )
     uint32_t ReData = 0;
     uint8_t Buff[3] = {};
     this->read_bytes(Addr, Buff, sizeof(Buff));
-    for( int i = 0 ; i < sizeof(Buff) ; i++ )
-    {
-        ReData <<= 8;
-        ReData |= Buff[i];
-    }
-    return ReData;
+    return detail::decode24(Buff[0], Buff[1], Buff[2]);
 }
 
 uint32_t AXP192Component::Read32bit( uint8_t Addr )
@@ -215,12 +204,7 @@ uint32_t AXP192Component::Read32bit( uint8_t Addr )
     uint32_t ReData = 0;
     uint8_t Buff[4] = {};
     this->read_bytes(Addr, Buff, sizeof(Buff));
-    for( int i = 0 ; i < sizeof(Buff) ; i++ )
-    {
-        ReData <<= 8;
-        ReData |= Buff[i];
-    }
-    return ReData;
+    return detail::decode32(Buff[0], Buff[1], Buff[2], Buff[3]);
 }
 
 void AXP192Component::ReadBuff( uint8_t Addr , uint8_t Size , uint8_t *Buff )
@@ -341,7 +325,7 @@ float AXP192Component::GetCoulombData(void)
 
   //c = 65536 * current_LSB * (coin - coout) / 3600 / ADC rate
   //Adc rate can be read from 84H ,change this variable if you change the ADC reate
-  float ccc = 65536.0 * 0.5 * (static_cast<double>(coin) - static_cast<double>(coout)) / 3600.0 / 200.0;
+  float ccc = static_cast<float>(detail::coulomb_mAh(coin, coout));
   return ccc;
 
 }
@@ -566,13 +550,13 @@ float AXP192Component::GetAPSVoltage()
 float AXP192Component::GetBatCoulombInput()
 {
     uint32_t ReData = Read32bit( 0xB0 );
-    return ReData * 65536.0 * 0.5 / 3600.0 / 200.0;
+    return detail::coulomb_mAh(ReData, 0);
 }
 
 float AXP192Component::GetBatCoulombOut()
 {
     uint32_t ReData = Read32bit( 0xB4 );
-    return ReData * 65536.0 * 0.5 / 3600.0 / 200.0;
+    return detail::coulomb_mAh(ReData, 0);
 }
 
 void AXP192Component::SetCoulombClear()
